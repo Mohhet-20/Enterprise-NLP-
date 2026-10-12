@@ -1,0 +1,37 @@
+# Assumes an ingress-nginx controller is already installed on the cluster.
+# TLS is referenced (tls-ready architecture) but the actual cert-manager
+# Certificate resource / ClusterIssuer isn't included here — that's a
+# cluster-level concern outside this application's manifests.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: nlp-platform-ingress
+  namespace: nlp-platform
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"  # dataset CSV uploads
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - app.example.com
+      secretName: nlp-platform-tls
+  rules:
+    - host: app.example.com
+      http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 80

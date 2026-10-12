@@ -1,0 +1,15 @@
+# Non-secret configuration only — anything sensitive belongs in secret.yaml
+# instead. Consumed by the backend Deployment via envFrom.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nlp-platform-config
+  namespace: nlp-platform
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "INFO"
+  LOG_JSON: "true"
+  DATABASE_URL: "sqlite:////data/nlp_platform.db"
+  REDIS_URL: "redis://redis:6379/0"
+  RATE_LIMIT_REQUESTS_PER_MINUTE: "60"
+  ALLOWED_ORIGINS: '["https://app.example.com"]'

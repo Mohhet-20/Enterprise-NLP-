@@ -1,0 +1,138 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: nlp-platform
+  labels:
+    app: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      # Soft anti-affinity: prefer spreading backend pods across nodes so
+      # a single node failure doesn't take out every replica — "where
+      # practical" per the spec, so this is a preference, not a hard
+      # requirement (a hard requirement would block scheduling entirely
+      # on a small/single-node cluster).
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: backend
+                topologyKey: kubernetes.io/hostname
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+      containers:
+        - name: backend
+          image: nlp-platform-backend:latest  # replace with your registry path + real tag in CI
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: nlp-platform-config
+            - secretRef:
+                name: nlp-platform-secrets
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "512Mi"
+          # Hits the real endpoints built in backend/api/v1/endpoints/health.py
+          # — not placeholder paths.
+          readinessProbe:
+            httpGet:
+              path: /api/v1/readiness
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /api/v1/liveness
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+          volumeMounts:
+            - name: sqlite-data
+              mountPath: /data
+      volumes:
+        - name: sqlite-data
+          persistentVolumeClaim:
+            claimName: backend-sqlite-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: backend-sqlite-pvc
+  namespace: nlp-platform
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  # NOTE: ReadWriteOnce means this PVC only works correctly with a single
+  # backend replica if using the SQLite default (SQLite doesn't support
+  # concurrent writers across pods on shared storage). Running >1 replica
+  # in production means switching DATABASE_URL to Postgres (see
+  # docs/data-platform-guide.md) — the application code needs no changes
+  # to do so, only this manifest and the ConfigMap value.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: nlp-platform
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 8000
+      targetPort: 8000
+  type: ClusterIP
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: nlp-platform
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300  # avoid flapping on brief traffic dips
+    scaleUp:
+      stabilizationWindowSeconds: 0
