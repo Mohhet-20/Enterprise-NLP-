@@ -85,7 +85,7 @@ def main() -> None:
         pick_task(page, "Toxicity Detection")
         page.fill("textarea", "Shut up, you worthless idiot. Nobody wants you here.")
         page.get_by_role("button", name="Run prediction").click()
-        page.wait_for_selector("text=multi-label", timeout=120_000)
+        page.wait_for_selector("text=every label above 50%", timeout=120_000)
         page.wait_for_timeout(600)
         snap(page, "playground-toxicity")
 

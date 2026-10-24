@@ -25,9 +25,14 @@ const EVALUABLE_TASKS: NLPTask[] = [
 ];
 
 const BUILTIN_SETS = {
-  challenge_set: "Challenge set — 48 hard cases (negation, sarcasm)",
-  sst2_validation: "SST-2 validation — 872 sentences",
+  challenge_set: "Challenge set (48 hard cases)",
+  sst2_validation: "SST-2 validation (872)",
 } as const;
+
+export function evalSetLabel(evalSet: string): string {
+  if (evalSet in BUILTIN_SETS) return BUILTIN_SETS[evalSet as keyof typeof BUILTIN_SETS];
+  return evalSet.startsWith("dataset:") ? `Dataset: ${evalSet.slice("dataset:".length)}` : evalSet;
+}
 
 export function EvaluationsPage() {
   const [source, setSource] = useState<string>("challenge_set");
@@ -145,7 +150,7 @@ export function EvaluationsPage() {
                       </Link>
                     </TableCell>
                     <TableCell className="font-mono text-xs text-muted-foreground">{run.model_name}</TableCell>
-                    <TableCell className="text-xs">{run.eval_set}</TableCell>
+                    <TableCell className="text-xs">{evalSetLabel(run.eval_set)}</TableCell>
                     <TableCell>
                       <Badge variant={run.accuracy >= 0.8 ? "default" : run.accuracy >= 0.6 ? "secondary" : "destructive"}>
                         {(run.accuracy * 100).toFixed(1)}%

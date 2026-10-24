@@ -29,7 +29,9 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
   checks, Docker builds; tag-triggered releases.
 - Opt-in integration suite (`pytest -m integration`) against every real checkpoint.
 - Playground batch tab, zero-shot label input, similarity pair input, per-task examples.
-- `docs/model-cards.md`.
+- `docs/model-cards.md`, with measured failure modes (toxicity identity-term bias,
+  language ID on one-word inputs).
+- `scripts/seed_demo.py` and `scripts/capture_screenshots.py` (Playwright).
 
 ### Changed
 - `NLPTask` lists only tasks that are actually served (removed hate speech, fake news,
@@ -38,10 +40,21 @@ Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 - JWT library: python-jose → PyJWT; decoding now requires `exp` and `sub`.
 - FastAPI 0.115 → 0.162, Starlette 0.46 → 1.9, python-multipart → 0.0.32.
 - React Router 6 → 7, Vite 5 → 8, Vitest 2 → 5 (frontend build 15s → 2.5s).
+- Removed the non-functional workspace selector from the top nav.
 - Docker image ships CPU PyTorch, honours `$PORT`, runs one worker by default;
   Kubernetes memory sized for resident models.
 
 ### Fixed
+- **The app shell crashed for every signed-in user**: a Tooltip in the top nav was rendered
+  outside any `TooltipProvider`. Found by driving the UI with Playwright.
+- **Calibration buckets were mislabelled** and most samples went uncounted (sklearn's
+  `calibration_curve` drops empty bins, but its output was zipped onto every bin edge).
+  Every evaluation now also reports ECE.
+- **`/predict` spent ~150 ms per request in `gc.collect()`**, called on every model lookup.
+  p50 went from 165 ms to 17.8 ms; found by load testing.
+- Reported latency included first-use model loading.
+- Zero-shot scored label hypotheses one forward pass at a time (now batched, 3.9× faster).
+- `.env.example` CORS origins didn't include the Vite dev server.
 - Evaluation run ids are validated as UUIDs before they touch the filesystem
   (path traversal via `..\` on Windows).
 - Evaluation history was sorted by UUID instead of by time.

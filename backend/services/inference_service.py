@@ -41,6 +41,9 @@ class InferenceService(BaseService):
         plugin = get_task_plugin(task)
         resolved_name = model_name or plugin.default_model_name
         model = model_factory.get_model(plugin.default_architecture, resolved_name, task=task)
+        # Load (or download) weights before any timer starts: reported latency
+        # and the metrics registry should reflect inference, not a one-off load.
+        model.load()
         return model, display_model_name(resolved_name)
 
     def _timed(self, task: NLPTask, model_name: str, fn):

@@ -1,6 +1,6 @@
 import { Fragment } from "react";
 import { useParams } from "react-router-dom";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Download, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -146,6 +146,7 @@ export function EvaluationDetailPage() {
                   <XAxis dataKey="bucket" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
                   <YAxis tick={{ fontSize: 11 }} unit="%" stroke="hsl(var(--muted-foreground))" />
                   <Tooltip contentStyle={{ background: "hsl(var(--popover))", border: "1px solid hsl(var(--border))", fontSize: 12 }} />
+                  <Legend iconType="square" iconSize={10} wrapperStyle={{ fontSize: 11 }} />
                   <Bar dataKey="confidence" fill="hsl(var(--muted-foreground))" radius={[3, 3, 0, 0]} name="Avg confidence" />
                   <Bar dataKey="accuracy" fill="hsl(var(--primary))" radius={[3, 3, 0, 0]} name="Actual accuracy" />
                 </BarChart>

@@ -4,9 +4,9 @@
 
 | Suite | Command | Count | Runtime | Network |
 |---|---|---|---|---|
-| Backend unit + API | `pytest` | BACKEND_UNIT | ~2 min | none |
-| Backend integration (real models) | `pytest -m integration` | BACKEND_INTEG | ~INTEG_TIME (after download) | first run downloads ~2.5GB |
-| Frontend | `cd frontend && npm test` | FRONTEND_COUNT | ~10 s | none |
+| Backend unit + API | `pytest` | 175 | ~2 min | none |
+| Backend integration (real models) | `pytest -m integration` | 14 | ~30 s (after download) | first run downloads ~2.5GB |
+| Frontend | `cd frontend && npm test` | 33 | ~10 s | none |
 | Lint | `ruff check backend tests scripts`, `npm run lint` | — | seconds | none |
 
 All of them run in CI (`.github/workflows/ci.yml`); integration runs on pushes to `main`.

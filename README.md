@@ -2,9 +2,9 @@
 
 A full-stack platform for serving, evaluating and explaining transformer NLP models.
 It serves 8 tasks with real Hugging Face models, including a DistilBERT sentiment model
-fine-tuned here on SST-2. Every prediction can be explained with Integrated Gradients,
-and every model is scored against a baseline on held-out data, all behind an
-authenticated, role-based API with a React UI.
+fine-tuned here on SST-2. Classifier predictions can be explained word by word with
+Integrated Gradients, and any single-label model can be scored on held-out or uploaded
+data, all behind an authenticated, role-based API with a React UI.
 
 ![Playground: prediction with Integrated Gradients explanation](docs/images/playground-explain.png)
 
@@ -27,14 +27,50 @@ Sources, licenses and known failure modes for each model are in [docs/model-card
 
 **Sentiment, SST-2 validation (872 sentences) and the 48-sentence challenge set** (negation, sarcasm, mixed sentiment):
 
-RESULTS_TABLE
+| System | SST-2 accuracy | SST-2 macro-F1 | Challenge set accuracy |
+|---|---|---|---|
+| Lexicon baseline (bag-of-words + negation) | 55.73% | 0.444 | 81.25% |
+| DistilBERT, public SST-2 checkpoint | 91.06% | 0.910 | 87.50% |
+| **DistilBERT, fine-tuned here** | 90.37% | 0.903 | 81.25% |
+
+Our model also has ROC-AUC 0.970 and calibration error (ECE) 0.045 on SST-2. It was trained
+for one epoch on the full 67k-sentence train split, on a laptop CPU in 92 minutes.
+
+**What the numbers say:**
+- The lexicon baseline is near chance on real text (55.7%), and both transformers clear 90%.
+- The challenge set flatters the baseline because it was written alongside the lexicon's
+  word lists. It's a diagnostic, not a benchmark.
+- **Sarcasm is the shared blind spot.** "Love how it stopped working after just two days.
+  Fantastic." is POSITIVE at 0.99 confidence for both transformers. Per-sentence breakdown:
+  [reports/sentiment_error_analysis.md](reports/sentiment_error_analysis.md).
 
 **CPU inference, FP32 vs dynamic INT8 quantization:**
 
-BENCHMARK_TABLE
+| Variant | Size | p50 latency, batch 1 | Throughput, batch 32 | SST-2 accuracy |
+|---|---|---|---|---|
+| fp32 | 268 MB | 18.5 ms | 42 texts/s | 90.37% |
+| int8-dynamic | 139 MB | 23.7 ms | 123 texts/s | 88.99% |
+
+INT8 halves the model and roughly triples batch throughput for −1.4 accuracy points, but it's
+*slower* for single texts, because quantizing activations on the fly costs more than it saves
+on tiny inputs. Use it for batch jobs and keep FP32 for interactive latency. Medians of 5
+alternating rounds on an Intel Core Ultra 9 185H laptop.
+
+**Served end to end** (`scripts/load_test.py`, one uvicorn worker): `POST /predict` sentiment at
+**17.8 ms p50 / 55 req/s**. The first load test measured 165 ms because of a `gc.collect()`
+on every model lookup. Finding and fixing that is written up in the
+[testing guide](docs/testing-and-qa-guide.md#load-testing-scriptsload_testpy).
 
 Reproduce with `python scripts/evaluate_sentiment.py` and `python scripts/benchmark_inference.py`.
 Raw numbers are in [reports/](reports/) and [benchmarks/](benchmarks/).
+
+## Screenshots
+
+| Evaluation run: confusion matrix, calibration, misclassified samples | Multi-label toxicity |
+|---|---|
+| ![Evaluation detail](docs/images/evaluation-detail.png) | ![Toxicity](docs/images/playground-toxicity.png) |
+| **Zero-shot with labels chosen per request** | **Model vs baseline across datasets** |
+| ![Zero-shot](docs/images/playground-zero-shot.png) | ![Evaluations](docs/images/evaluations.png) |
 
 ## Architecture
 
@@ -75,8 +111,11 @@ Details: [docs/architecture-guide.md](docs/architecture-guide.md).
 - **Supply chain**: `pip-audit` reports 0 known vulnerabilities after migrating
   python-jose → PyJWT and upgrading FastAPI/Starlette; frontend production dependencies
   report 0 too.
-- **Tests that don't lie**: TEST_COUNTS. Unit tests never touch the network (an autouse
-  fake model); `pytest -m integration` checks real checkpoints on unambiguous inputs.
+- **Tests at three levels**: 175 backend unit/API tests that never touch the network (an
+  autouse fake model), 14 integration tests on the real checkpoints, and 33 frontend tests,
+  including one that mounts the whole app shell. Driving the real UI with Playwright found
+  two bugs no unit test had caught: a provider-wiring crash after login, and mislabelled
+  calibration buckets. Both are fixed and covered by tests now.
 
 ## Quickstart
 
@@ -93,14 +132,15 @@ cd frontend && npm install && npm run dev                # http://localhost:5173
 ```
 
 In development a bootstrap account is seeded: `admin` / `ChangeMe123!`. It is never
-created in production. Models download on first use (~2.5GB for all eight).
+created in production. Models download on first use (~2.5GB for all eight). To fill the UI
+with real evaluation runs, a deployed model and a dataset, run `python scripts/seed_demo.py`.
 
 Or with Docker: `docker compose -f docker/docker-compose.yml --profile prod up --build`.
 
 ## Train, evaluate, benchmark
 
 ```bash
-python scripts/train_sentiment.py          # fine-tune DistilBERT on SST-2 (TRAIN_TIME on a 16-thread CPU)
+python scripts/train_sentiment.py          # fine-tune DistilBERT on SST-2 (92 min on a laptop CPU, minutes on a GPU)
 python scripts/evaluate_sentiment.py       # baseline vs public checkpoint vs ours
 python scripts/benchmark_inference.py      # latency / throughput / accuracy, FP32 vs INT8
 python scripts/load_test.py --base-url http://127.0.0.1:8000
@@ -162,8 +202,8 @@ docker/               Dockerfiles + Compose
 ## Limitations and roadmap
 
 - Only the sentiment model is fine-tuned here; the other tasks serve public checkpoints.
-- CPU-first: no GPU serving, no dynamic request batching across clients, and no ONNX
-  Runtime path yet.
+- CPU-first: no GPU serving, no server-side micro-batching across clients, no
+  length-bucketed batching (padding waste caps batch-32 FP32 gains), and no ONNX Runtime path yet.
 - Vector indices are in-memory per process (pgvector is the next step).
 - No MFA, password reset or email verification.
 - No distributed job queue, scheduled re-evaluation, tracing or Prometheus endpoint.

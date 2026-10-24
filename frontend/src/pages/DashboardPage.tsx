@@ -73,7 +73,7 @@ export function DashboardPage() {
           Welcome back{user?.username ? `, ${user.username}` : ""}
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          A real-time view of the platform — every number below comes from a live API call, not sample data.
+          Datasets, models, evaluations and service health at a glance.
         </p>
       </div>
 
@@ -151,7 +151,7 @@ export function DashboardPage() {
             ) : (
               Object.entries(status.data?.checks ?? {}).map(([name, check]) => (
                 <div key={name} className="flex items-center justify-between text-sm">
-                  <span className="capitalize text-muted-foreground">{name}</span>
+                  <span className="capitalize text-muted-foreground">{name.replace(/_/g, " ")}</span>
                   <Badge variant={check.status === "ok" ? "default" : check.status === "not_implemented" ? "outline" : "destructive"}>
                     {check.status}
                   </Badge>
