@@ -1,9 +1,8 @@
 """
 Reliability primitives: retry with exponential backoff, and a lightweight
-circuit breaker. Both are plain, dependency-free Python — genuinely
-useful for wrapping calls to anything that can transiently fail (an
-external API, a flaky network call), and fully unit-testable without any
-real flaky dependency, since the test doubles the failure behavior itself.
+circuit breaker, in plain dependency-free Python, for wrapping anything
+that can transiently fail (an external API, a model-hub download). The
+tests drive the failure behaviour directly, so no flaky dependency is needed.
 """
 
 import functools

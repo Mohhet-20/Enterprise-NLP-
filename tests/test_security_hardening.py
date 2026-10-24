@@ -271,3 +271,28 @@ def test_non_auth_endpoints_unaffected_by_the_stricter_auth_limit(client, db_ses
         assert all(r.status_code == 200 for r in responses)
     finally:
         settings.auth_rate_limit_requests_per_minute = original_auth
+
+
+def test_token_without_expiry_is_rejected():
+    import jwt
+    import pytest
+
+    from backend.auth.jwt_handler import decode_access_token
+    from backend.core.exceptions import AuthenticationError
+
+    settings = get_settings()
+    forever = jwt.encode({"sub": "someone"}, settings.secret_key, algorithm=settings.jwt_algorithm)
+    with pytest.raises(AuthenticationError):
+        decode_access_token(forever)
+
+
+def test_token_signed_with_none_algorithm_is_rejected():
+    import jwt
+    import pytest
+
+    from backend.auth.jwt_handler import decode_access_token
+    from backend.core.exceptions import AuthenticationError
+
+    unsigned = jwt.encode({"sub": "admin", "exp": 9999999999}, key=None, algorithm="none")
+    with pytest.raises(AuthenticationError):
+        decode_access_token(unsigned)

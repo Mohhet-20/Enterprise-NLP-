@@ -48,6 +48,6 @@ def seed_default_admin(db: Session) -> None:
         extra={
             "username": DEFAULT_ADMIN_USERNAME,
             "note": "Development-only bootstrap account. Change this password "
-            "immediately in any environment other than a local sandbox.",
+            "immediately in any environment other than local development.",
         },
     )

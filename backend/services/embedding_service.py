@@ -144,6 +144,14 @@ class EmbeddingIndexService:
         self._encoder_name = encoder or get_settings().embedding_encoder
         self._indices: Dict[str, EmbeddingIndex] = {}
 
+    @property
+    def encoder_name(self) -> str:
+        return self._encoder_name
+
+    @property
+    def index_count(self) -> int:
+        return len(self._indices)
+
     def _make_encoder(self):
         return DenseEncoder() if self._encoder_name == "dense" else TfidfEncoder()
 

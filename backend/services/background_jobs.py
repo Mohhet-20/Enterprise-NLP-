@@ -1,9 +1,8 @@
 """
 Background job functions, dispatched via FastAPI's `BackgroundTasks`
-(runs after the response has been sent, in the same process — a real
-in-process async job, not a distributed task queue; see
-PROJECT_STATUS.md for the Celery/RQ-style distributed version this would
-become at real scale).
+(runs after the response has been sent, in the same process). A
+distributed queue (Celery / RQ / Arq) is the next step once jobs need to
+survive restarts or run on separate workers.
 
 Each function opens its own database session rather than reusing the
 request-scoped one: `get_db_session`'s `finally: session.close()` runs as

@@ -1,19 +1,11 @@
 """
 A small, deterministic lexicon-based sentiment classifier.
 
-This is NOT a stand-in that fakes predictions — it's a real, if simple,
-NLP technique (bag-of-words polarity scoring, in the spirit of tools like
-VADER) that actually reads each text and computes a genuine label and
-confidence from it. It exists because this sandbox has no network access
-to the Hugging Face Hub, so a real pretrained transformer can't be
-downloaded here (see docs/architecture-guide.md). Using this baseline
-means every metric the Evaluation Center reports — confusion matrix,
-per-class F1, misclassified samples — reflects an actual classifier's
-actual mistakes, not fabricated numbers.
-
-Swap this for `backend.nlp.inference.model_factory` once real model
-weights are available; the Evaluation Center only depends on the
-(text) -> (label, confidence) contract below, not on this implementation.
+Bag-of-words polarity scoring with one-token negation flipping, in the
+spirit of VADER. It is the floor every served model has to beat: the
+Evaluation Center runs it on the same data as the transformer, and the
+gap between the two (especially on the challenge set's negation and
+sarcasm cases) shows what a contextual model buys.
 """
 
 import re

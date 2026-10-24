@@ -1,8 +1,8 @@
 """
 Model Registry orchestration.
 
-The business rules enforced here (not just documented — actually raise if
-violated) are what make this a registry rather than a CRUD table:
+The business rules enforced here (each raises on violation) are what make
+this a registry rather than a CRUD table:
 
 - A model can only be promoted to PRODUCTION once it's APPROVED.
 - A model can only be deployed once it's in PRODUCTION and APPROVED.

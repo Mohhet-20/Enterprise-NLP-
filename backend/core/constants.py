@@ -39,7 +39,7 @@ class ExperimentStatus(str, Enum):
 class ModelLifecycleStage(str, Enum):
     """Where a registered model sits in its promotion path. Only APPROVED
     models can be promoted to PRODUCTION (enforced in
-    backend/services/model_registry_service.py, not just documented here)."""
+    backend/services/model_registry_service.py)."""
 
     DEVELOPMENT = "development"
     STAGING = "staging"

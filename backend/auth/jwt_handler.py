@@ -4,7 +4,7 @@ handles token encode/decode so the two concerns can evolve independently."""
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict
 
-from jose import JWTError, jwt
+import jwt
 
 from backend.config.settings import get_settings
 from backend.core.exceptions import AuthenticationError
@@ -22,6 +22,11 @@ def create_access_token(subject: str, extra_claims: Dict[str, Any] | None = None
 def decode_access_token(token: str) -> Dict[str, Any]:
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.secret_key, algorithms=[settings.jwt_algorithm])
-    except JWTError as exc:
+        return jwt.decode(
+            token,
+            settings.secret_key,
+            algorithms=[settings.jwt_algorithm],
+            options={"require": ["exp", "sub"]},
+        )
+    except jwt.InvalidTokenError as exc:
         raise AuthenticationError("Invalid or expired token.") from exc

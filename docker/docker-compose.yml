@@ -7,11 +7,6 @@
 # Usage:
 #   docker compose --profile dev up
 #   docker compose --profile prod --profile prod-postgres up
-#
-# NOTE ON VERIFICATION: written to a real, valid compose spec and
-# YAML-syntax-checked in this build (see PROJECT_STATUS.md) — this
-# sandbox has no Docker daemon, so `docker compose up` itself has not
-# been run here.
 
 x-backend-common: &backend-common
   build:

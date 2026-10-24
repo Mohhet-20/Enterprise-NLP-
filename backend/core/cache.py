@@ -1,18 +1,14 @@
 """
 Cache backend with automatic Redis-or-in-memory fallback.
 
-This is the correct production pattern regardless of this sandbox's
-constraints: a cache is an optimization, not a hard dependency — an app
-that crashes (or even fails a request) because its cache is temporarily
-unreachable has turned an optimization into an outage. So every method
-here catches Redis connection errors and transparently falls back to an
-in-process dict, logging a warning once rather than on every call.
+A cache is an optimization, not a hard dependency — an app that fails a
+request because its cache is temporarily unreachable has turned an
+optimization into an outage. So every method here catches Redis
+connection errors and transparently falls back to an in-process dict,
+logging a warning once rather than on every call.
 
-This also happens to make the feature genuinely testable in this sandbox
-either way: with `redis-server` running (verified working — see
-CHANGELOG.md), calls exercise the real Redis path; without it, the same
-test exercises the in-memory fallback. Both are real code paths, not one
-real and one theoretical.
+The same tests therefore exercise the Redis path when `redis-server` is
+running and the in-memory path when it isn't.
 """
 
 import json

@@ -17,7 +17,7 @@ export function ComingSoonPage() {
           <h2 className="font-display text-lg font-semibold">{item?.label ?? "This page"} isn't built yet</h2>
           <p className="text-sm text-muted-foreground">
             {item?.description.replace(" — coming soon", "") ??
-              "This section of the platform hasn't been implemented in this build."}{" "}
+              "This section of the platform is on the roadmap."}{" "}
             This stage of the project focused on the app shell and the
             Inference Playground — this page is next in line.
           </p>

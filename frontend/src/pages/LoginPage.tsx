@@ -109,7 +109,7 @@ export function LoginPage() {
         </Card>
 
         <p className="mt-4 text-center text-xs text-muted-foreground">
-          Local sandbox: a seeded <code className="font-mono">admin</code> account exists
+          Local development: a seeded <code className="font-mono">admin</code> account exists
           in development — see the backend README for credentials.
         </p>
       </motion.div>

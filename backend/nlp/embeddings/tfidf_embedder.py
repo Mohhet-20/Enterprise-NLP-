@@ -1,12 +1,8 @@
 """
-Real embedding generation via TF-IDF vectors (scikit-learn).
+Sparse lexical embeddings via TF-IDF (scikit-learn).
 
-This sandbox has no network access to the Hugging Face Hub, so a real
-sentence-transformer can't be downloaded here (see PROJECT_STATUS.md).
-TF-IDF is a legitimate, real, pre-neural embedding technique still used
-in production search/retrieval systems today — it gives every claim this
-platform makes about embeddings (similarity, search, statistics) something
-actually computed to point to, rather than a canned response.
+The dense, semantic path is `SentenceTransformerModel`; this one needs no
+model download and remains the right tool for exact-term matching.
 
 Standalone `embed()`/`similarity()` calls (the BaseEmbedder contract) fit
 a fresh vectorizer per call when nothing has been fit yet — fine for a

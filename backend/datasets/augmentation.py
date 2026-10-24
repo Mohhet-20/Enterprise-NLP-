@@ -1,13 +1,11 @@
 """
-Text augmentation. Synonym replacement uses a small hand-built synonym
-table rather than a downloaded model (same constraint as everywhere else
-in this build — no HF Hub access). Random deletion/swap/insertion are
-genuine, seedable implementations of the standard EDA (Easy Data
-Augmentation) techniques — real string manipulation, not placeholders.
+Text augmentation: seedable implementations of the four EDA operations
+(Wei & Zou, 2019) — synonym replacement, random deletion, random swap and
+random insertion. Synonym replacement uses a small hand-built table so
+augmentation stays deterministic and dependency-free.
 
-Back-translation and neural paraphrasing are NOT implemented here — both
-fundamentally require a real translation/generation model, which this
-sandbox can't download. See PROJECT_STATUS.md.
+Back-translation and neural paraphrasing are not implemented; both need a
+generation model, which is out of scope for a classification platform.
 """
 
 import random

@@ -1,12 +1,10 @@
 """
 A hand-labeled evaluation set for the `sentiment_analysis` task.
 
-Deliberately mixes easy examples (clear lexicon signal) with hard ones
-(negation, sarcasm, mixed sentiment, very short text) so that running the
-baseline classifier (backend/evaluation/baseline_classifier.py) against it
-produces genuine, varied errors — not a suspiciously perfect scorecard.
-Every label here is a real judgment call a human annotator would make,
-not generated from the classifier itself.
+A targeted stress test rather than a benchmark: it mixes easy examples
+(clear lexicon signal) with the phenomena bag-of-words models get wrong —
+negation, sarcasm, mixed sentiment, very short text. Use the SST-2
+validation split for headline accuracy numbers.
 """
 
 from dataclasses import dataclass

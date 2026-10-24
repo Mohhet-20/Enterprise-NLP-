@@ -1,11 +1,9 @@
 """
 Health & Observability checks.
 
-Every function here does real work — queries the database, reads actual
-process/system state, introspects the real model factory and metrics
-registry — rather than returning a hardcoded `{"status": "ok"}`. Where a
-subsystem genuinely isn't implemented yet (embeddings), the check says so
-explicitly instead of faking a healthy response; see PROJECT_STATUS.md.
+Each check inspects live state — runs a database query, reads process and
+system metrics, introspects the model factory and metrics registry —
+rather than returning a fixed `{"status": "ok"}`.
 """
 
 import platform
@@ -60,15 +58,17 @@ def check_model_registry() -> Dict[str, Any]:
 
 
 def check_embedding_subsystem() -> Dict[str, Any]:
-    """Honest status: the embedding platform is architecture-only in this
-    build (BaseEmbedder interface exists, no concrete embedder is
-    registered) — see PROJECT_STATUS.md. A 200 with a clear
-    'not_implemented' status is more useful to a caller than either a
-    fake 'ok' or an opaque 404."""
+    """Which encoder backs the dataset vector index, and how many indices
+    are currently built in memory."""
+    from backend.core.constants import NLPTask
+    from backend.plugins.plugin_registry import get_task_plugin
+    from backend.services.embedding_service import embedding_index_service
+
     return {
-        "status": "not_implemented",
-        "detail": "backend/nlp/embeddings/ defines BaseEmbedder but no concrete "
-        "implementation is registered yet.",
+        "status": "ok",
+        "encoder": embedding_index_service.encoder_name,
+        "model": get_task_plugin(NLPTask.TEXT_EMBEDDINGS).default_model_name,
+        "indexed_datasets": embedding_index_service.index_count,
     }
 
 

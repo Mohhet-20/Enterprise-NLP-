@@ -21,10 +21,14 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ["react", "react-dom", "react-router-dom"],
-          charts: ["recharts"],
-          motion: ["framer-motion"],
+        // Function form: Vite 8 (rolldown) no longer accepts the object form.
+        manualChunks(id: string) {
+          const path = id.split("\\").join("/");
+          const inPkg = (...names: string[]) => names.some((n) => path.includes(`/node_modules/${n}/`));
+          if (inPkg("recharts", "victory-vendor") || path.includes("/node_modules/d3-")) return "charts";
+          if (inPkg("framer-motion", "motion-dom", "motion-utils")) return "motion";
+          if (inPkg("react", "react-dom", "react-router", "react-router-dom", "scheduler")) return "vendor";
+          return undefined;
         },
       },
     },

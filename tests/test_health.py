@@ -42,10 +42,12 @@ def test_model_health_reflects_real_plugin_registry(client):
     assert "distilbert" in body["registered_architectures"]
 
 
-def test_embedding_health_is_honest_about_not_being_implemented(client):
+def test_embedding_health_reports_encoder(client):
     response = client.get("/api/v1/embedding")
     assert response.status_code == 200
-    assert response.json()["status"] == "not_implemented"
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["encoder"] in {"dense", "tfidf"}
 
 
 def test_monitoring_health_reports_real_counts(client):
