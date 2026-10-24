@@ -186,6 +186,7 @@ class EvaluationService(BaseService):
             "macro_f1": metrics.macro_f1,
             "weighted_f1": metrics.weighted_f1,
             "roc_auc": metrics.roc_auc,
+            "ece": metrics.ece,
             "labels": metrics.labels,
             "confusion_matrix": metrics.confusion_matrix,
             "per_class": [pc.__dict__ for pc in metrics.per_class],

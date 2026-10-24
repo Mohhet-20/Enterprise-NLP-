@@ -24,7 +24,16 @@ def login(page: Page, base: str, username: str, password: str) -> None:
     page.fill("#username", username)
     page.fill("#password", password)
     page.click("button[type=submit]")
-    page.wait_for_url(f"{base}/", timeout=20_000)
+    page.wait_for_url(lambda url: "/login" not in url, timeout=20_000)
+
+
+def snap(page: Page, name: str) -> None:
+    """The shell is viewport-height with its own scroll container, so size the
+    capture to the bottom of the rendered content instead of the full viewport."""
+    bottom = page.evaluate(
+        "() => document.querySelector('main [class*=max-w-]').getBoundingClientRect().bottom"
+    )
+    page.screenshot(path=f"{OUT}/{name}.png", clip={"x": 0, "y": 0, "width": 1440, "height": min(2000, bottom + 32)})
 
 
 def pick_task(page: Page, label: str) -> None:
@@ -44,7 +53,7 @@ def main() -> None:
     with sync_playwright() as p:
         browser = p.chromium.launch()
         ctx = browser.new_context(
-            viewport={"width": 1440, "height": 1000}, device_scale_factor=2, color_scheme=args.theme
+            viewport={"width": 1440, "height": 2000}, device_scale_factor=2, color_scheme=args.theme
         )
         page = ctx.new_page()
         login(page, args.base, args.username, args.password)
@@ -58,7 +67,7 @@ def main() -> None:
         page.get_by_role("button", name="Explain this prediction").click()
         page.wait_for_selector("[data-testid=attribution-text]", timeout=120_000)
         page.wait_for_timeout(600)
-        page.screenshot(path=f"{OUT}/playground-explain.png", full_page=True)
+        snap(page, "playground-explain")
 
         # Zero-shot with request-time labels
         page.reload()
@@ -68,7 +77,7 @@ def main() -> None:
         page.get_by_role("button", name="Run prediction").click()
         page.wait_for_selector("text=Result", timeout=120_000)
         page.wait_for_timeout(600)
-        page.screenshot(path=f"{OUT}/playground-zero-shot.png", full_page=True)
+        snap(page, "playground-zero-shot")
 
         # Toxicity: multi-label output
         page.reload()
@@ -78,23 +87,23 @@ def main() -> None:
         page.get_by_role("button", name="Run prediction").click()
         page.wait_for_selector("text=multi-label", timeout=120_000)
         page.wait_for_timeout(600)
-        page.screenshot(path=f"{OUT}/playground-toxicity.png", full_page=True)
+        snap(page, "playground-toxicity")
 
         # Evaluations list (runs created beforehand via the API)
         page.goto(f"{args.base}/evaluations")
         page.wait_for_selector("table", timeout=20_000)
         page.wait_for_timeout(600)
-        page.screenshot(path=f"{OUT}/evaluations.png", full_page=True)
+        snap(page, "evaluations")
 
         # Detail of the newest run
         page.locator("table a").first.click()
         page.wait_for_selector("text=Confusion", timeout=20_000)
         page.wait_for_timeout(1200)
-        page.screenshot(path=f"{OUT}/evaluation-detail.png", full_page=True)
+        snap(page, "evaluation-detail")
 
         page.goto(f"{args.base}/")
         page.wait_for_timeout(2500)
-        page.screenshot(path=f"{OUT}/dashboard.png", full_page=True)
+        snap(page, "dashboard")
 
         browser.close()
     print("wrote", sorted(os.listdir(OUT)))

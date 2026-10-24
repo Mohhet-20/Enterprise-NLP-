@@ -89,6 +89,7 @@ class EvaluationRunResult(BaseModel):
     macro_f1: float
     weighted_f1: float
     roc_auc: Optional[float] = None
+    ece: Optional[float] = None
     labels: List[str]
     confusion_matrix: List[List[int]]
     per_class: List[PerClassMetricSchema]

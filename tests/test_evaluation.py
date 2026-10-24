@@ -257,3 +257,29 @@ def test_read_only_user_can_view_but_not_run_evaluations(client, db_session):
         "/api/v1/evaluation/run", headers=viewer_headers, json={"task": "sentiment_analysis"}
     )
     assert write_response.status_code == 403
+
+
+def test_calibration_bins_cover_every_sample_in_the_right_bucket():
+    # Confident model: nearly everything sits in the top bucket. A previous
+    # implementation zipped sklearn's compacted output onto the full edge list,
+    # labelling these as the 0.4–0.6 bucket and dropping most samples.
+    y_true = ["POSITIVE"] * 9 + ["NEGATIVE"]
+    y_pred = ["POSITIVE"] * 10
+    confidences = [0.99, 0.97, 0.95, 0.93, 0.91, 0.98, 1.0, 0.96, 0.55, 0.92]
+
+    metrics = compute_classification_metrics(y_true, y_pred, confidences)
+    bins = {(b.bucket_low, b.bucket_high): b for b in metrics.calibration_bins}
+
+    assert sum(b.count for b in metrics.calibration_bins) == 10
+    assert bins[(0.8, 1.0)].count == 9  # includes confidence == 1.0
+    assert bins[(0.4, 0.6)].count == 1
+    for b in metrics.calibration_bins:
+        assert b.bucket_low <= b.avg_confidence <= b.bucket_high
+
+
+def test_expected_calibration_error_is_weighted_gap():
+    y_true = ["POSITIVE", "POSITIVE", "NEGATIVE", "NEGATIVE"]
+    y_pred = ["POSITIVE", "POSITIVE", "POSITIVE", "POSITIVE"]
+    # One bucket (0.8–1.0), avg confidence 0.9, accuracy 0.5 -> ECE 0.4
+    metrics = compute_classification_metrics(y_true, y_pred, [0.9, 0.9, 0.9, 0.9])
+    assert metrics.ece == 0.4

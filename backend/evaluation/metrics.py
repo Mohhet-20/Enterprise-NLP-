@@ -9,7 +9,6 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 
 import numpy as np
-from sklearn.calibration import calibration_curve
 from sklearn.metrics import confusion_matrix, precision_recall_fscore_support, roc_auc_score
 
 
@@ -41,6 +40,7 @@ class ClassificationMetrics:
     labels: List[str]
     roc_auc: Optional[float] = None
     calibration_bins: List[CalibrationBin] = field(default_factory=list)
+    ece: float = 0.0
 
 
 def compute_classification_metrics(
@@ -102,6 +102,7 @@ def compute_classification_metrics(
         labels=resolved_labels,
         roc_auc=roc_auc,
         calibration_bins=calibration_bins,
+        ece=expected_calibration_error(calibration_bins),
     )
 
 
@@ -114,32 +115,37 @@ def _compute_calibration_bins(
     classifier's accuracy should track its confidence closely; large gaps
     indicate over- or under-confidence.
     """
-    correctness = np.array([1 if t == p else 0 for t, p in zip(y_true, y_pred)])
-    confidence_arr = np.array(confidences)
-
-    try:
-        observed_freq, mean_predicted = calibration_curve(
-            correctness, confidence_arr, n_bins=n_bins, strategy="uniform"
-        )
-    except ValueError:
-        return []
+    # Binned directly rather than via sklearn's calibration_curve, which drops
+    # empty bins from its output and so can't be zipped back onto bin edges.
+    correctness = np.array([1.0 if t == p else 0.0 for t, p in zip(y_true, y_pred)])
+    confidence_arr = np.clip(np.array(confidences, dtype=float), 0.0, 1.0)
 
     bin_edges = np.linspace(0.0, 1.0, n_bins + 1)
+    # Right-closed last bin so a confidence of exactly 1.0 is counted.
+    bin_ids = np.minimum(np.digitize(confidence_arr, bin_edges[1:-1], right=False), n_bins - 1)
+
     bins: List[CalibrationBin] = []
-    for i in range(len(mean_predicted)):
-        low, high = bin_edges[i], bin_edges[i + 1]
-        is_last = i == len(bin_edges) - 2
-        in_bin = (confidence_arr >= low) & (confidence_arr <= high if is_last else confidence_arr < high)
+    for i in range(n_bins):
+        in_bin = bin_ids == i
         count = int(in_bin.sum())
         if count == 0:
             continue
         bins.append(
             CalibrationBin(
-                bucket_low=round(float(low), 2),
-                bucket_high=round(float(high), 2),
-                avg_confidence=round(float(mean_predicted[i]), 4),
-                accuracy=round(float(observed_freq[i]), 4),
+                bucket_low=round(float(bin_edges[i]), 2),
+                bucket_high=round(float(bin_edges[i + 1]), 2),
+                avg_confidence=round(float(confidence_arr[in_bin].mean()), 4),
+                accuracy=round(float(correctness[in_bin].mean()), 4),
                 count=count,
             )
         )
     return bins
+
+
+def expected_calibration_error(bins: List[CalibrationBin]) -> float:
+    """ECE: the sample-weighted mean |accuracy − confidence| over buckets.
+    0 is perfectly calibrated; 0.05 means confidence is off by 5 points on average."""
+    total = sum(b.count for b in bins)
+    if total == 0:
+        return 0.0
+    return round(sum(b.count * abs(b.accuracy - b.avg_confidence) for b in bins) / total, 4)

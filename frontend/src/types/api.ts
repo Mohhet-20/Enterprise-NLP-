@@ -321,6 +321,7 @@ export interface EvaluationRunResult {
   macro_f1: number;
   weighted_f1: number;
   roc_auc: number | null;
+  ece: number | null;
   labels: string[];
   confusion_matrix: number[][];
   per_class: PerClassMetric[];

@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from "@/components/ui/table";
 import { ConfidenceChip } from "@/components/playground/ConfidenceChip";
+import { TASK_LABELS } from "@/components/playground/TaskSelector";
 import {
   useDownloadEvaluationReport,
   useDownloadMisclassifiedCsv,
@@ -40,7 +41,7 @@ export function EvaluationDetailPage() {
     <div className="mx-auto flex max-w-5xl flex-col gap-6 p-6">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">{run.task}</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">{TASK_LABELS[run.task] ?? run.task}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {run.model_name} · {run.eval_set} · {run.num_samples} samples · {new Date(run.created_at).toLocaleString()}
           </p>
@@ -125,7 +126,15 @@ export function EvaluationDetailPage() {
         <Card>
           <CardHeader>
             <CardTitle>Calibration</CardTitle>
-            <CardDescription>Confidence vs. actual accuracy per bucket — should track closely.</CardDescription>
+            <CardDescription>
+              Confidence vs. actual accuracy per bucket — should track closely.
+              {run.ece != null && (
+                <>
+                  {" "}
+                  ECE <span className="font-mono">{run.ece.toFixed(3)}</span> (mean gap, lower is better).
+                </>
+              )}
+            </CardDescription>
           </CardHeader>
           <CardContent className="h-48">
             {calibrationData.length === 0 ? (
