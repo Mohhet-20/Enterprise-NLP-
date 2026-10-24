@@ -9,11 +9,7 @@ export type NLPTask =
   | "emotion_detection"
   | "topic_classification"
   | "toxicity_detection"
-  | "hate_speech_detection"
-  | "fake_news_detection"
   | "language_detection"
-  | "intent_classification"
-  | "multi_label_classification"
   | "zero_shot_classification"
   | "semantic_similarity"
   | "text_embeddings";
@@ -34,6 +30,8 @@ export type UserRole =
 export interface TaskInfo {
   task: NLPTask;
   default_model: string;
+  description: string;
+  explainable: boolean;
 }
 
 export interface InferenceRequest {
@@ -41,6 +39,47 @@ export interface InferenceRequest {
   text: string;
   model_name?: string | null;
   candidate_labels?: string[] | null;
+  multi_label?: boolean;
+  text_pair?: string | null;
+}
+
+export interface BatchInferenceRequest {
+  task: NLPTask;
+  texts: string[];
+  candidate_labels?: string[] | null;
+  multi_label?: boolean;
+}
+
+export interface BatchInferenceResponse {
+  task: NLPTask;
+  model_name: string;
+  items: { text: string; results: InferenceResult[] }[];
+  latency_ms: number;
+  throughput_texts_per_second: number;
+}
+
+export interface ExplainRequest {
+  task: NLPTask;
+  text: string;
+  target_label?: string | null;
+  n_steps?: number;
+}
+
+export interface TokenAttribution {
+  token: string;
+  importance: number;
+}
+
+export interface ExplainResponse {
+  task: NLPTask;
+  model_name: string;
+  method: string;
+  label: string;
+  target_score: number;
+  baseline_score: number;
+  convergence_delta: number;
+  attributions: TokenAttribution[];
+  latency_ms: number;
 }
 
 export interface InferenceResult {
@@ -247,12 +286,25 @@ export interface ErrorSummary {
   length_slices: LengthSlice[];
 }
 
+export type EvaluationModelKind = "served" | "lexicon_baseline";
+export type BuiltinEvalSet = "challenge_set" | "sst2_validation";
+
+export interface EvaluationRunRequest {
+  task: NLPTask;
+  model: EvaluationModelKind;
+  eval_set?: BuiltinEvalSet;
+  dataset_id?: string | null;
+}
+
 export interface EvaluationRunSummary {
   run_id: string;
   task: NLPTask;
   model_name: string;
+  model_kind: EvaluationModelKind;
+  eval_set: string;
   created_at: string;
   accuracy: number;
+  macro_f1: number | null;
   num_samples: number;
 }
 
@@ -260,6 +312,9 @@ export interface EvaluationRunResult {
   run_id: string;
   task: NLPTask;
   model_name: string;
+  model_kind: EvaluationModelKind;
+  eval_set: string;
+  duration_seconds: number | null;
   created_at: string;
   num_samples: number;
   accuracy: number;

@@ -42,7 +42,7 @@ export function EvaluationDetailPage() {
         <div>
           <h1 className="font-display text-2xl font-semibold tracking-tight">{run.task}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {run.model_name} · {run.num_samples} samples · {new Date(run.created_at).toLocaleString()}
+            {run.model_name} · {run.eval_set} · {run.num_samples} samples · {new Date(run.created_at).toLocaleString()}
           </p>
         </div>
         <div className="flex items-center gap-2">

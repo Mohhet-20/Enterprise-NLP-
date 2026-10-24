@@ -35,6 +35,8 @@
 
     --destructive: 6 55% 42%;
     --destructive-foreground: 0 0% 98%;
+    --attr-positive: 145 55% 38%;
+    --attr-negative: 4 70% 50%;
 
     --warning: 28 55% 48%;
     --warning-foreground: 30 45% 12%;
@@ -70,6 +72,8 @@
 
     --destructive: 5 70% 63%;
     --destructive-foreground: 0 0% 8%;
+    --attr-positive: 145 50% 50%;
+    --attr-negative: 4 75% 62%;
 
     --warning: 28 62% 62%;
     --warning-foreground: 30 40% 10%;

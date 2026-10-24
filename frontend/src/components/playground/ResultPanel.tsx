@@ -36,9 +36,8 @@ export function ResultPanel({ response, error, isPending }: ResultPanelProps) {
           <p>{isApiError ? error.message : "Something went wrong reaching the API."}</p>
           {isApiError && error.code === "ModelLoadError" && (
             <p className="text-muted-foreground">
-              This backend build ships model interfaces without the heavy
-              `transformers`/`torch` dependencies installed — install them
-              server-side to serve real predictions.
+              The server couldn't load this model. Check that the ML extras are installed
+              (requirements-ml.txt) and the model cache is reachable.
             </p>
           )}
           {isApiError && error.requestId && (
@@ -65,6 +64,8 @@ export function ResultPanel({ response, error, isPending }: ResultPanelProps) {
     score: Math.round(score * 1000) / 10,
   }));
   const top = response.results[0];
+  const isSimilarity = response.task === "semantic_similarity";
+  const isMultiLabel = response.results.length > 1;
 
   return (
     <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }}>
@@ -73,9 +74,25 @@ export function ResultPanel({ response, error, isPending }: ResultPanelProps) {
           <CardTitle>Result</CardTitle>
         </CardHeader>
         <CardContent className="flex flex-col gap-5">
-          {top && <ConfidenceChip label={top.label} score={top.score} emphasis />}
+          {isSimilarity && top ? (
+            <div className="flex flex-col gap-2">
+              <span className="font-display text-3xl font-semibold tabular-nums">{top.score.toFixed(3)}</span>
+              <span className="text-xs text-muted-foreground">
+                Cosine similarity of the two sentence embeddings (1 = same meaning, ~0 = unrelated).
+              </span>
+            </div>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              {response.results.map((r, i) => (
+                <ConfidenceChip key={r.label} label={r.label} score={r.score} emphasis={i === 0} />
+              ))}
+              {isMultiLabel && (
+                <span className="text-xs text-muted-foreground">multi-label: every label above 50%</span>
+              )}
+            </div>
+          )}
 
-          {chartData.length > 1 && (
+          {!isSimilarity && chartData.length > 1 && (
             <div className="h-40 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 16 }}>

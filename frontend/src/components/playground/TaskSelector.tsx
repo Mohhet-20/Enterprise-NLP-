@@ -7,16 +7,12 @@ interface TaskSelectorProps {
   onChange: (task: NLPTask) => void;
 }
 
-const TASK_LABELS: Record<string, string> = {
+export const TASK_LABELS: Record<NLPTask, string> = {
   sentiment_analysis: "Sentiment Analysis",
   emotion_detection: "Emotion Detection",
   topic_classification: "Topic Classification",
   toxicity_detection: "Toxicity Detection",
-  hate_speech_detection: "Hate Speech Detection",
-  fake_news_detection: "Fake News Detection",
   language_detection: "Language Detection",
-  intent_classification: "Intent Classification",
-  multi_label_classification: "Multi-label Classification",
   zero_shot_classification: "Zero-shot Classification",
   semantic_similarity: "Semantic Similarity",
   text_embeddings: "Text Embeddings",
@@ -24,7 +20,8 @@ const TASK_LABELS: Record<string, string> = {
 
 export function TaskSelector({ value, onChange }: TaskSelectorProps) {
   const { data, isLoading } = useTasks();
-  const registeredTasks = data?.tasks ?? [];
+  // Raw vectors aren't meaningful to eyeball; /embed serves them to API clients.
+  const registeredTasks = (data?.tasks ?? []).filter((t) => t.task !== "text_embeddings");
 
   return (
     <Select value={value} onValueChange={(v) => onChange(v as NLPTask)}>

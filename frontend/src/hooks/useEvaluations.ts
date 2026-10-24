@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/api";
 import { useAuthStore } from "@/stores/useAuthStore";
-import type { EvaluationRunResult, EvaluationRunSummary, NLPTask } from "@/types/api";
+import type { EvaluationRunRequest, EvaluationRunResult, EvaluationRunSummary } from "@/types/api";
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8000/api/v1";
 
@@ -23,8 +23,8 @@ export function useEvaluationRun(runId: string | undefined) {
 export function useRunEvaluation() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (task: NLPTask) =>
-      apiRequest<EvaluationRunResult>("/evaluation/run", { method: "POST", body: { task } }),
+    mutationFn: (request: EvaluationRunRequest) =>
+      apiRequest<EvaluationRunResult>("/evaluation/run", { method: "POST", body: request }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["evaluations"] }),
   });
 }
