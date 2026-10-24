@@ -5,11 +5,10 @@ import uuid
 
 import pytest
 
+from backend.config.settings import get_settings
 from backend.core.cache import CacheService
 from backend.core.resilience import CircuitBreaker, CircuitOpenError, CircuitState, retry
-from backend.config.settings import get_settings
 from backend.repositories.user_repository import UserRepository
-
 
 # --- Cache ---
 

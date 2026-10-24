@@ -2,10 +2,10 @@ import csv
 import io
 import uuid
 
-from backend.core.common_passwords import is_common_password
-from backend.utils.csv_safety import sanitize_csv_cell, sanitize_csv_row
 from backend.config.settings import get_settings
+from backend.core.common_passwords import is_common_password
 from backend.repositories.user_repository import UserRepository
+from backend.utils.csv_safety import sanitize_csv_cell, sanitize_csv_row
 
 
 def _unique_username(prefix: str = "sechardening") -> str:

@@ -50,7 +50,7 @@ def test_embedding_health_is_honest_about_not_being_implemented(client):
 
 def test_monitoring_health_reports_real_counts(client):
     # Generate at least one real prediction attempt so the counter is non-trivial.
-    login = client.post(
+    client.post(
         "/api/v1/auth/register",
         json={"username": "healthcheckuser", "email": "healthcheckuser@example.com", "password": "StrongPass123!"},
     )

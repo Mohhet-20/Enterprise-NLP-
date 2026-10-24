@@ -9,7 +9,6 @@ part of the pytest suite, which shouldn't depend on a running server):
 """
 
 import argparse
-import statistics
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 

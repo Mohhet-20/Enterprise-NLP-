@@ -6,7 +6,6 @@ from backend.nlp.embeddings.tfidf_embedder import TfidfEmbedder
 from backend.repositories.user_repository import UserRepository
 from backend.services.embedding_service import EmbeddingIndexService
 
-
 # --- Unit tests ---
 
 
