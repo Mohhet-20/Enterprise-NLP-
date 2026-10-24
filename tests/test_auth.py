@@ -203,8 +203,5 @@ def test_registered_user_can_call_predict(client):
         headers={"Authorization": f"Bearer {login_body['access_token']}"},
         json={"task": "sentiment_analysis", "text": "Great news."},
     )
-    # transformers/torch aren't installed in this environment, so a clean
-    # ModelLoadError (500) is expected — the important assertion is that
-    # auth + RBAC passed (not 401/403).
-    assert response.status_code in (200, 500)
-    assert response.status_code not in (401, 403)
+    assert response.status_code == 200
+    assert response.json()["results"][0]["label"] == "POSITIVE"

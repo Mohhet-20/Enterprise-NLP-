@@ -1,13 +1,22 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from backend.core.constants import NLPTask
 
 
 class EvaluationRunRequest(BaseModel):
+    model_config = ConfigDict(protected_namespaces=())
+
     task: NLPTask
+    model: Literal["served", "lexicon_baseline"] = Field(
+        default="served", description="The task's served transformer, or the lexicon baseline."
+    )
+    eval_set: Literal["challenge_set", "sst2_validation"] = "challenge_set"
+    dataset_id: Optional[str] = Field(
+        default=None, description="Evaluate on an uploaded Data Platform dataset instead of a built-in set."
+    )
 
 
 class PerClassMetricSchema(BaseModel):
@@ -56,8 +65,11 @@ class EvaluationRunSummary(BaseModel):
     run_id: str
     task: NLPTask
     model_name: str
+    model_kind: str = "lexicon_baseline"
+    eval_set: str = "challenge_set"
     created_at: datetime
     accuracy: float
+    macro_f1: Optional[float] = None
     num_samples: int
 
 
@@ -67,8 +79,11 @@ class EvaluationRunResult(BaseModel):
     run_id: str
     task: NLPTask
     model_name: str
+    model_kind: str = "lexicon_baseline"
+    eval_set: str = "challenge_set"
     created_at: datetime
     num_samples: int
+    duration_seconds: Optional[float] = None
 
     accuracy: float
     macro_f1: float

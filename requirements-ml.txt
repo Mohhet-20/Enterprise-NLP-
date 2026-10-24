@@ -1,0 +1,13 @@
+# Model serving / training extras. The API runs without these (and the unit
+# tests stub models), but every NLP task needs them to serve real predictions.
+#
+# CPU-only torch (much smaller wheel):
+#   pip install torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu
+-r requirements.txt
+torch==2.14.1
+transformers==4.46.3
+sentence-transformers==3.3.1
+datasets==3.1.0
+accelerate==1.1.1
+sentencepiece==0.2.0
+protobuf==5.28.3

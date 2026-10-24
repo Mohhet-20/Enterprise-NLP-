@@ -3,9 +3,11 @@ import io
 
 from fastapi import APIRouter, Depends
 from fastapi.responses import PlainTextResponse, StreamingResponse
+from sqlalchemy.orm import Session
 
 from backend.auth.dependencies import get_current_user
 from backend.auth.rbac import require_permission
+from backend.database.session import get_db_session
 from backend.reporting.report_generator import MarkdownEvaluationReport
 from backend.schemas.auth import CurrentUser
 from backend.schemas.evaluation import (
@@ -24,9 +26,18 @@ _report_generator = MarkdownEvaluationReport()
 def run_evaluation(
     request: EvaluationRunRequest,
     current_user: CurrentUser = Depends(get_current_user),
+    db: Session = Depends(get_db_session),
 ) -> EvaluationRunResult:
     require_permission(current_user.role, "experiment:write")
-    result = evaluation_service.run_evaluation(request.task)
+    if request.dataset_id:
+        require_permission(current_user.role, "dataset:read")
+    result = evaluation_service.run_evaluation(
+        request.task,
+        model=request.model,
+        eval_set=request.eval_set,
+        dataset_id=request.dataset_id,
+        db=db,
+    )
     return EvaluationRunResult.model_validate(result)
 
 

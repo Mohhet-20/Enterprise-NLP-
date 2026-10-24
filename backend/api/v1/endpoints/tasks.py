@@ -6,7 +6,7 @@ list separately from the backend's real capabilities.
 
 from fastapi import APIRouter
 
-from backend.plugins.plugin_registry import get_task_plugin, list_supported_tasks
+from backend.plugins.plugin_registry import display_model_name, get_task_plugin, list_supported_tasks
 
 router = APIRouter()
 
@@ -18,7 +18,9 @@ def list_tasks() -> dict:
         "tasks": [
             {
                 "task": task.value,
-                "default_model": get_task_plugin(task).default_model_name,
+                "default_model": display_model_name(get_task_plugin(task).default_model_name),
+                "description": get_task_plugin(task).description,
+                "explainable": get_task_plugin(task).explainer is not None,
             }
             for task in tasks
         ]

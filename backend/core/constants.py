@@ -6,18 +6,15 @@ from enum import Enum
 
 
 class NLPTask(str, Enum):
-    """Registry of supported NLP tasks. Add new tasks here — this is the
-    one place a new task's identifier needs to be declared."""
+    """Every task the platform serves. Each one has a registered plugin and
+    a real model behind it (see backend/plugins/__init__.py) — a task is
+    only added here once it works end to end."""
 
     SENTIMENT_ANALYSIS = "sentiment_analysis"
     EMOTION_DETECTION = "emotion_detection"
     TOPIC_CLASSIFICATION = "topic_classification"
     TOXICITY_DETECTION = "toxicity_detection"
-    HATE_SPEECH_DETECTION = "hate_speech_detection"
-    FAKE_NEWS_DETECTION = "fake_news_detection"
     LANGUAGE_DETECTION = "language_detection"
-    INTENT_CLASSIFICATION = "intent_classification"
-    MULTI_LABEL_CLASSIFICATION = "multi_label_classification"
     ZERO_SHOT_CLASSIFICATION = "zero_shot_classification"
     SEMANTIC_SIMILARITY = "semantic_similarity"
     TEXT_EMBEDDINGS = "text_embeddings"
@@ -28,9 +25,7 @@ class ModelArchitecture(str, Enum):
     ROBERTA = "roberta"
     DEBERTA = "deberta"
     DISTILBERT = "distilbert"
-    ELECTRA = "electra"
-    MINILM = "minilm"
-    MPNET = "mpnet"
+    XLM_ROBERTA = "xlm_roberta"
     SENTENCE_TRANSFORMER = "sentence_transformer"
 
 

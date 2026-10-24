@@ -19,10 +19,12 @@ def test_factory_caches_instances_by_key():
     assert first is second
 
 
-def test_factory_raises_for_unregistered_architecture():
-    factory = ModelFactory()
+def test_factory_raises_for_unregistered_architecture(monkeypatch):
+    import backend.nlp.inference.model_factory as mf
+
+    monkeypatch.delitem(mf._ARCHITECTURE_REGISTRY, ModelArchitecture.ROBERTA)
     with pytest.raises(ModelNotFoundError):
-        factory.get_model(ModelArchitecture.ROBERTA, "roberta-base")
+        ModelFactory().get_model(ModelArchitecture.ROBERTA, "roberta-base")
 
 
 def test_plugin_registry_has_sentiment_analysis_registered():
@@ -34,7 +36,12 @@ def test_plugin_registry_has_sentiment_analysis_registered():
 
 
 def test_plugin_registry_raises_for_unregistered_task():
+    from backend.plugins import plugin_registry
     from backend.plugins.plugin_registry import get_task_plugin
 
-    with pytest.raises(ValidationError):
-        get_task_plugin(NLPTask.ZERO_SHOT_CLASSIFICATION)
+    saved = plugin_registry._TASK_PLUGINS.pop(NLPTask.ZERO_SHOT_CLASSIFICATION)
+    try:
+        with pytest.raises(ValidationError):
+            get_task_plugin(NLPTask.ZERO_SHOT_CLASSIFICATION)
+    finally:
+        plugin_registry._TASK_PLUGINS[NLPTask.ZERO_SHOT_CLASSIFICATION] = saved

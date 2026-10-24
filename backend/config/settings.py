@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # --- Core ---
     app_name: str = "Enterprise NLP Intelligence Platform"
-    app_version: str = "0.4.0"  # bumped with each build pass — see CHANGELOG.md
+    app_version: str = "1.0.0"  # see CHANGELOG.md
     environment: Environment = Environment.DEVELOPMENT
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
@@ -75,11 +75,16 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     log_json: bool = True
 
-    # --- NLP / Model defaults ---
-    default_model_name: str = "distilbert-base-uncased"
+    # --- NLP / Model serving ---
     model_cache_dir: str = "./.model_cache"
     max_sequence_length: int = 512
     inference_batch_size: int = 16
+    max_batch_texts: int = 64
+    # Upper bound on models holding weights in memory at once (LRU-evicted).
+    max_loaded_models: int = 4
+    # Locally fine-tuned sentiment checkpoint (scripts/train_sentiment.py).
+    # Served in preference to the public SST-2 checkpoint when present.
+    sentiment_checkpoint_dir: str = "./artifacts/models/distilbert-sst2"
 
     # --- Experiment tracking ---
     experiments_dir: str = "./experiments_store"

@@ -10,6 +10,7 @@ core platform (API, services) can look up capabilities by task name without
 an if/elif chain anywhere.
 """
 
+import os
 from dataclasses import dataclass
 from typing import Dict, Optional, Type
 
@@ -26,6 +27,7 @@ class TaskPlugin:
     default_model_name: str
     evaluator: Optional[Type[BaseEvaluator]] = None
     explainer: Optional[Type[BaseExplainer]] = None
+    description: str = ""
 
 
 _TASK_PLUGINS: Dict[NLPTask, TaskPlugin] = {}
@@ -44,3 +46,12 @@ def get_task_plugin(task: NLPTask) -> TaskPlugin:
 
 def list_supported_tasks() -> list[NLPTask]:
     return list(_TASK_PLUGINS.keys())
+
+
+def display_model_name(model_name: str) -> str:
+    """Public name for a model. Local checkpoints are absolute paths on the
+    server; expose only the directory name so filesystem layout never leaks
+    into API responses."""
+    if os.path.isabs(model_name):
+        return os.path.basename(os.path.normpath(model_name))
+    return model_name

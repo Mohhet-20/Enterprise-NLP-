@@ -51,3 +51,8 @@ Thumbs.db
 *.egg
 build/
 *.tsbuildinfo
+
+# Model weights / caches (large; reproducible via scripts/)
+artifacts/models/
+.model_cache/
+benchmarks/_tmp/

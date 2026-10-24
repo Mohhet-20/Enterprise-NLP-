@@ -7,7 +7,6 @@ from backend.evaluation.error_analysis import EvalSampleResult, error_analyzer
 from backend.evaluation.metrics import compute_classification_metrics
 from backend.repositories.user_repository import UserRepository
 
-
 # --- Unit tests: metrics ---
 
 
@@ -138,7 +137,7 @@ def test_run_evaluation_produces_real_metrics(client, db_session):
     response = client.post(
         "/api/v1/evaluation/run",
         headers={"Authorization": f"Bearer {access_token}"},
-        json={"task": "sentiment_analysis"},
+        json={"task": "sentiment_analysis", "model": "lexicon_baseline"},
     )
     assert response.status_code == 200
     body = response.json()
