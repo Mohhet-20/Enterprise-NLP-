@@ -16,6 +16,7 @@ from backend.core.constants import NLPTask
 from backend.core.exceptions import ModelLoadError, ValidationError
 from backend.nlp.embeddings.base_embedder import BaseEmbedder
 from backend.nlp.inference.base_model import BaseNLPModel, Prediction
+from backend.nlp.inference.hub import load_with_retry
 
 
 class SentenceTransformerModel(BaseNLPModel, BaseEmbedder):
@@ -32,8 +33,8 @@ class SentenceTransformerModel(BaseNLPModel, BaseEmbedder):
         except ImportError as exc:
             raise ModelLoadError("Embeddings require the 'sentence-transformers' package.") from exc
         try:
-            self._model = SentenceTransformer(
-                self.model_name, cache_folder=get_settings().model_cache_dir, device="cpu"
+            self._model = load_with_retry(
+                lambda: SentenceTransformer(self.model_name, cache_folder=get_settings().model_cache_dir, device="cpu")
             )
         except Exception as exc:  # noqa: BLE001
             raise ModelLoadError(f"Failed to load model '{self.model_name}': {exc}") from exc

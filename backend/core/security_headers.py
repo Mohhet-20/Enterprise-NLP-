@@ -1,5 +1,5 @@
 """
-Two focused, real protections that were missing before this pass:
+Two request/response protections:
 
 1. Security headers on every response. Not a comprehensive CSP (which
    would need to be tuned against the actual frontend's asset origins to

@@ -302,3 +302,29 @@ def test_evaluation_run_ids_cannot_escape_store(client, db_session, run_id):
     headers = _login(client, db_session, role="ml_engineer")
     response = client.get(f"/api/v1/evaluation/runs/{run_id}", headers=headers)
     assert response.status_code == 404
+
+
+def test_hub_loads_retry_transient_errors_only(monkeypatch):
+    import backend.core.resilience as resilience
+    from backend.nlp.inference.hub import load_with_retry
+
+    monkeypatch.setattr(resilience.time, "sleep", lambda _s: None)
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise ConnectionError("reset by peer")
+        return "weights"
+
+    assert load_with_retry(flaky) == "weights"
+    assert calls["n"] == 3
+
+    def missing_repo():
+        calls["n"] += 1
+        raise OSError("repo not found")
+
+    calls["n"] = 0
+    with pytest.raises(OSError):
+        load_with_retry(missing_repo)
+    assert calls["n"] == 1

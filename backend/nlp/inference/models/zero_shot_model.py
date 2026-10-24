@@ -15,6 +15,7 @@ from backend.config.settings import get_settings
 from backend.core.constants import NLPTask
 from backend.core.exceptions import ModelLoadError, ValidationError
 from backend.nlp.inference.base_model import BaseNLPModel, Prediction
+from backend.nlp.inference.hub import load_with_retry
 
 MAX_CANDIDATE_LABELS = 20
 
@@ -30,11 +31,13 @@ class ZeroShotModel(BaseNLPModel):
         except ImportError as exc:
             raise ModelLoadError("Zero-shot classification requires 'transformers' and 'torch'.") from exc
         try:
-            self._pipeline = pipeline(
-                "zero-shot-classification",
-                model=self.model_name,
-                model_kwargs={"cache_dir": get_settings().model_cache_dir},
-                device=-1,
+            self._pipeline = load_with_retry(
+                lambda: pipeline(
+                    "zero-shot-classification",
+                    model=self.model_name,
+                    model_kwargs={"cache_dir": get_settings().model_cache_dir},
+                    device=-1,
+                )
             )
         except Exception as exc:  # noqa: BLE001
             raise ModelLoadError(f"Failed to load model '{self.model_name}': {exc}") from exc

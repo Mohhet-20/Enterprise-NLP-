@@ -1,128 +1,62 @@
 # Security
 
-## Pass 8 security audit — hardening findings and fixes
+## Reporting a vulnerability
 
-A real review pass across auth, API surface, file uploads, and CSV
-export/import, done by actually reading the code (not a checklist
-exercise). Findings that were genuine gaps, fixed this pass:
+Please open a private security advisory on the repository rather than a public issue.
 
-| Finding | Risk | Fix |
+## Controls
+
+| Area | Control | Where |
 |---|---|---|
-| No security headers on responses | Clickjacking, MIME-sniffing, referrer leakage | `SecurityHeadersMiddleware` — `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` on every response |
-| No request body size limit | A single request could buffer an arbitrarily large body before validation ever runs — memory exhaustion | `RequestSizeLimitMiddleware`, 15MB default, checked via `Content-Length` before buffering; real end-to-end test against a standalone app confirms a 413 |
-| CSV upload had no size or row-count cap | Same class of risk, upload-specific | 10MB file-size cap + 50,000-row cap (`backend/services/dataset_service.py`) |
-| CSV export echoed user text unsanitized | **CSV/formula injection** (OWASP-documented): a cell starting with `=`, `+`, `-`, or `@` is interpreted as a formula by Excel/Sheets when opened, not literal text — could exfiltrate data or execute a formula-based attack against whoever opens the export | `backend/utils/csv_safety.py` — prefixes a neutralizing single quote onto any cell starting with a formula-trigger character; applied to the misclassified-samples CSV export |
-| Password policy was length-only (≥8 chars, no upper bound, no breach check) | Extremely long inputs (hashing-cost concern) and, more importantly, common/breached passwords were both still accepted | Added a max length (128) and a real common-password denylist (`backend/core/common_passwords.py`, sourced from well-known breach-compilation frequency lists) — per NIST 800-63B guidance, this matters more than arbitrary complexity rules |
-| Login/register shared the same rate limit as the general API (60/min) | An attacker could attempt many different (username, password) pairs quickly — the per-account lockout only protects one specific account, not the endpoint itself | Auth endpoints (`/auth/login`, `/auth/register`, `/auth/refresh`) now get a separate, stricter limit (10/min default), independent of the per-account lockout already in place |
+| Passwords | bcrypt hashing; 8–128 chars; common-password denylist (NIST 800-63B) | `backend/auth/password.py`, `backend/core/common_passwords.py` |
+| Access tokens | HS256 JWT via PyJWT; algorithm allow-list (rejects `alg: none`); `exp` and `sub` required | `backend/auth/jwt_handler.py` |
+| Refresh tokens | Opaque random strings, SHA-256 hashed at rest, rotated on every use, individually and bulk revocable | `backend/services/auth_service.py` |
+| Brute force | Per-account lockout after repeated failures, plus a stricter 10/min rate limit on login/register/refresh | `backend/services/auth_service.py`, `backend/core/rate_limiting.py` |
+| Authorisation | 9-role RBAC checked per endpoint; model approval requires a different role from the one that registers it (separation of duties) | `backend/auth/rbac.py` |
+| Rate limiting | Per user (or per IP when anonymous), Redis-backed with in-memory fallback | `backend/core/rate_limiting.py` |
+| Request limits | 15MB body cap checked from `Content-Length` before buffering; 10MB / 50k-row CSV cap; 64 texts per batch inference call | `backend/core/security_headers.py`, `backend/services/dataset_service.py`, `backend/config/settings.py` |
+| Response headers | `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy` | `backend/core/security_headers.py` |
+| CSV injection | Cells starting with `= + - @` are neutralised in every CSV export | `backend/utils/csv_safety.py` |
+| Path traversal | Evaluation run ids must parse as UUIDs before touching the filesystem; uploaded filenames are never used as paths | `backend/evaluation/evaluation_store.py` |
+| Information leakage | Local checkpoint paths are reduced to a directory name in every API response | `backend/plugins/plugin_registry.py` |
+| SQL injection | All queries go through the SQLAlchemy ORM; the one raw statement (`SELECT 1` health probe) takes no input | — |
+| Audit trail | Persisted, queryable, restricted to Auditor/Admin roles | `backend/services/audit_service.py` |
+| Secrets | Environment variables only; the app refuses to start in production with the default `SECRET_KEY` | `backend/config/settings.py` |
+| CORS | Explicit origin allow-list | `backend/config/settings.py` |
+| Containers | Non-root users in backend and frontend images | `docker/` |
 
-### Reviewed and found already correct (not changed, because nothing was wrong)
+All of the above are covered by tests in `tests/test_security_hardening.py`,
+`tests/test_auth.py`, `tests/test_rbac.py` and `tests/test_inference.py`.
 
-- **JWT algorithm confusion**: `jwt.decode(..., algorithms=[settings.jwt_algorithm])` already explicitly restricts accepted algorithms — a token claiming `alg: none` or a different algorithm is already rejected. No "alg:none" vulnerability present.
-- **SQL injection**: every query in the codebase goes through SQLAlchemy's ORM (parameterized by construction); the one raw-SQL call (`db.execute(text("SELECT 1"))` in the database health check) is a hardcoded literal with no user input anywhere near it.
-- **Path traversal via uploaded filenames**: the dataset upload endpoint reads a filename only to check its `.csv` extension — it's never used to construct a filesystem path (content is parsed in memory and persisted as database rows, never written to disk under a user-supplied name).
-- **Separation of duties**: model approval already required a different role (Reviewer/Admin/Super Admin) than the one that can register a model (any `experiment:write` role) — verified this holds and wasn't accidentally bypassable through any other endpoint.
+## Dependency scanning
 
-## Dependency vulnerability scanning
+CI runs `pip-audit` on every push, and `npm audit` can be run locally in `frontend/`.
 
-The CI pipeline (`.github/workflows/ci.yml`, job `backend-security-scan`)
-runs [`pip-audit`](https://pypi.org/project/pip-audit/) against
-`requirements.txt` on every push. This isn't a scanner nobody looks at —
-it was run for real during this build, and the results below are the
-actual before/after, not a hypothetical.
+| Scope | Status |
+|---|---|
+| Backend (`requirements.txt`) | **0 known vulnerabilities** |
+| Frontend production dependencies | **0 known vulnerabilities** |
+| Frontend dev tooling | 3 moderate advisories, all in Tailwind CSS 3's PostCSS chain |
 
-### Before → after (pass 7)
+Getting the backend to zero took more than version bumps:
 
-Running `pip-audit -r requirements.txt --strict` at the start of this
-pass found **23 known vulnerabilities across 5 packages**. After bumping
-what could be safely bumped:
+- **`python-jose` → `PyJWT`.** python-jose pins `pyasn1<0.5` and depends on `ecdsa`,
+  which has an unfixed timing side-channel advisory. Neither could be resolved by
+  upgrading, so the JWT layer was migrated (`backend/auth/jwt_handler.py`). The
+  migration also tightened validation to require the `exp` and `sub` claims.
+- **FastAPI 0.115 → 0.162**, which lifts the old `starlette<0.47` cap. Starlette is now
+  pinned at 1.9.0 explicitly, so a resolver can never fall back to a vulnerable 0.x.
+- **python-multipart 0.0.22 → 0.0.32.**
 
-| Package | Before | After | Vulnerabilities remaining |
-|---|---|---|---|
-| `fastapi` | 0.115.0 | 0.115.14 | — (patch-level bump within the same minor line, pulled in a fixed starlette baseline) |
-| `python-jose` | 3.3.0 | 3.4.0 | — (fixed) |
-| `python-multipart` | 0.0.9 | 0.0.22 | 5 (newer fixes exist at 0.0.26+; not verified compatible in this pass) |
-| `pytest` | 8.3.3 | 9.0.3 | — (fixed; dev/test dependency, not shipped in the runtime container) |
-| `starlette` | 0.38.6 (transitive) | 0.46.2 (transitive) | 9 |
-| `pyasn1` | (transitive) 0.4.8 | 0.4.8 | 1 |
-| `ecdsa` | 0.19.2 | 0.19.2 | 1 |
+On the frontend, React Router 7 fixes an open-redirect advisory, and Vite 8 / Vitest 5
+clear the esbuild dev-server and test-runner advisories.
 
-**Result: 23 → 16 known vulnerabilities.** Not zero — and the remaining
-16 are left at that count deliberately, not silently:
+**Remaining:** the 3 Tailwind 3 advisories affect only build-time CSS processing of the
+project's own source; no user input reaches it. The fix is a Tailwind 4 migration
+(CSS-first config, renamed utilities), which is tracked separately.
 
-- **`starlette`** is a transitive dependency of `fastapi==0.115.14`, which
-  pins `starlette<0.47.0`. The fixes for its remaining CVEs land in
-  0.47.2+ and the 1.x line — taking them means upgrading FastAPI past
-  0.115.x, which is a real (if probably safe) breaking-change surface I
-  didn't want to absorb blind in the same pass as everything else in
-  this build. Tracked as a follow-up, not ignored.
-- **`pyasn1`** is a transitive dependency of `python-jose==3.4.0`, which
-  pins `pyasn1<0.5.0`. The fix (0.6.3) is incompatible with the current
-  `python-jose` pin. The actual fix here is probably replacing
-  `python-jose` with `PyJWT` (which doesn't carry this constraint) — a
-  real migration, not a version bump, and out of scope for this pass.
-- **`ecdsa`** (PYSEC-2026-1325, a Minerva-style timing side-channel) has
-  **no fix version available upstream** — this is a known, disputed issue
-  in the `ecdsa` project; pure-Python ECDSA is inherently harder to make
-  constant-time, and the maintainers have not shipped a fix as of this
-  writing. Nothing in this platform's dependency tree can resolve it by
-  bumping a version number.
-- **`python-multipart`** has fixes available past 0.0.22 (up to 0.0.31),
-  not applied here because I didn't verify them against this exact
-  FastAPI/Starlette combination in the time this pass had — a real
-  "should do, didn't get to" rather than an oversight I'm hiding.
+## Out of scope
 
-This is genuinely how dependency security work goes in practice: some
-fixes are a version bump, some require a real migration, and some don't
-exist yet. Pretending otherwise (either by not running the scanner, or by
-running it and not reading the output) would be worse than reporting 16
-remaining findings honestly.
-
-## Application-level security posture
-
-Covered elsewhere in this codebase, summarized here for one-stop reference:
-
-- **Passwords**: bcrypt-hashed (`backend/auth/password.py`), never logged
-  or returned in any API response.
-- **Refresh tokens**: opaque random strings, SHA-256-hashed at rest,
-  rotating on every use, individually and bulk-revocable
-  (`backend/services/auth_service.py`).
-- **Account lockout**: after repeated failed logins
-  (`backend/services/auth_service.py`).
-- **RBAC**: 9 roles, permission-gated per endpoint
-  (`backend/auth/rbac.py`); model approval specifically requires a
-  different role than the one that can submit a model, for separation of
-  duties.
-- **Rate limiting**: per-user (or per-IP if unauthenticated), Redis-backed
-  with in-memory fallback (`backend/core/rate_limiting.py`), with a
-  stricter separate limit on auth endpoints (added this pass).
-- **Audit trail**: persisted, queryable, restricted to the Auditor/Admin
-  roles (`backend/services/audit_service.py`).
-- **Secrets**: loaded from environment variables only; the app refuses to
-  start in production with the default `SECRET_KEY`
-  (`backend/config/settings.py`).
-- **CORS**: explicit allow-list, not `*`.
-- **Container security**: non-root users in both the backend and frontend
-  images (`docker/Dockerfile`, `docker/frontend.Dockerfile`).
-- **Request/response hardening**: security headers, request size limits,
-  CSV formula-injection protection, common-password denylist (all added
-  this pass — see the audit table above).
-
-## Frontend dependencies
-
-`npm audit` found one real, moderate-severity issue: `esbuild <=0.24.2`
-(GHSA-67mh-4wv8-2f99), transitively bundled via Vite 5.x — dev-server-only
-impact, production build unaffected. A fix was attempted (Vite 8.x) and
-reverted after it broke the production build (incompatible bundler
-config API) — see `docs/testing-and-qa-guide.md` for the full account,
-including why forcing it through would have been the wrong call.
-
-## What's NOT implemented
-
-TLS termination (left to the ingress/load balancer — see
-`deployment/k8s/ingress.yaml`), secrets management beyond environment
-variables (no Vault/AWS Secrets Manager/Sealed Secrets integration),
-field-level encryption for dataset content, and image vulnerability
-scanning (e.g. Trivy) in CI. (`ruff`/`eslint`/`vitest` **are** now real
-blocking gates in `.github/workflows/ci.yml` — see
-`docs/testing-and-qa-guide.md` for what wiring them in actually found.)
-See `PROJECT_STATUS.md`.
+TLS termination (handled by the ingress / load balancer), a secrets manager beyond
+environment variables, field-level encryption of dataset content, and container image
+scanning.

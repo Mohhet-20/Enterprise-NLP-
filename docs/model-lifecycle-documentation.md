@@ -1,41 +1,42 @@
 # Model Lifecycle
 
+## Serving path
+
 ```
-1. Registered      A TaskPlugin declares a default (architecture, model_name)
-                    in backend/plugins/__init__.py.
+1. Registered   A TaskPlugin declares the task's default (architecture, checkpoint),
+                evaluator and explainer — backend/plugins/__init__.py.
 
-2. Requested        A client calls POST /predict with a task (and optionally
-                    an explicit model_name override).
+2. Requested    POST /predict (or /predict/batch, /explain) names a task and
+                optionally a model_name override.
 
-3. Resolved          model_factory.get_model(architecture, model_name) checks
-                    its in-memory cache for an existing instance.
+3. Resolved     model_factory.get_model(architecture, name, task) returns a cached
+                strategy instance; zero-shot is routed to the NLI strategy.
 
-4. Loaded (lazy)     On first use, BaseNLPModel.load() pulls tokenizer +
-                    weights (currently via `transformers.AutoModel*`,
-                    swappable per architecture). Cached in-process after
-                    that — no reload per request.
+4. Loaded       First use pulls tokenizer + weights into memory (from
+                MODEL_CACHE_DIR, or a local checkpoint directory). If more than
+                MAX_LOADED_MODELS now hold weights, the least recently used one is
+                unloaded and will reload on its next request.
 
-5. Inference         BaseNLPModel.predict() runs, wrapped in a Timer and
-                    recorded to MetricsRegistry (count, latency, error rate
-                    per task:model_name).
+5. Inference    One padded forward pass under torch.inference_mode(); latency and
+                errors recorded per task:model in the MetricsRegistry.
 
-6. Evaluated          (training/eval pipeline, not the request path) —
-                    BaseEvaluator computes metrics against a held-out split,
-                    logged via ExperimentTracker.
-
-7. Compared           ExperimentTracker.compare(...) pulls the same metric
-                    across multiple experiment_ids for side-by-side review.
-
-8. Explained (opt.)   BaseExplainer.explain() attributes the prediction to
-                    input tokens, for human review workflows.
-
-9. Retired            Not yet implemented: a future `ModelRegistry` version
-                    field + `deprecated_at` timestamp would let old model
-                    versions be phased out without breaking in-flight
-                    requests. Flagged here so the schema addition is
-                    anticipated rather than a later migration surprise.
+6. Explained    /explain runs Integrated Gradients against the same loaded weights.
 ```
 
-This lifecycle deliberately keeps "load" separate from "predict" and both
-separate from "train"/"evaluate" so that swapping in a real training loop
-later doesn't touch the inference path at all.
+## Promotion path (Model Registry)
+
+```
+train ─► evaluate ─► register ─► approve ─► promote ─► deploy ─► champion
+  │          │          │           │          │          │
+  │          │          │           │          │          └ previous deployment for the
+  │          │          │           │          │            task is rolled back automatically
+  │          │          │           │          └ production only once approved
+  │          │          │           └ Reviewer/Admin only (separation of duties)
+  │          │          └ POST /models, linked to an evaluation_run_id
+  │          └ POST /evaluation/run — served model vs baseline, same data
+  └ scripts/train_sentiment.py → checkpoint + metrics.json + model card
+```
+
+Load, predict, train and evaluate are deliberately separate steps, so changing the
+training recipe never touches the inference path, and a model can be re-evaluated on
+new data without retraining.

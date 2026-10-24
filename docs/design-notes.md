@@ -55,5 +55,5 @@ a CSS media query that collapses all transition/animation durations.
 Standard enterprise shell: fixed sidebar (collapsible) + top bar (breadcrumbs,
 global search, status, notifications, theme, user) + scrollable content area.
 Not reinvented — for a data-dense internal tool, the value is in the content
-(the confidence chip, the honest "coming soon" states, the live status
+(the confidence chip, the explicit "coming soon" states, the live status
 indicator), not in a novel navigation paradigm.

@@ -11,24 +11,20 @@ for the platform's overall layering — this doc is scoped to the data layer.
   the same code path — `backend/database/session.py` picks connection
   args based on the `DATABASE_URL` scheme, and every model uses portable
   SQLAlchemy column types (no SQLite-only constructs). Switching is just
-  `DATABASE_URL=postgresql://...` + the `psycopg2-binary` driver (now a
-  dependency) — verified in this build by constructing a real engine
-  against a `postgresql://` URL and confirming SQLAlchemy resolves the
-  dialect correctly. **Not verified**: an actual running Postgres
-  instance — there's no persistent background service across tool calls
-  in this sandbox to test against, so this is a code-level guarantee, not
-  a live integration test.
-- **Redis (caching)** and a **vector database** are architectural targets,
-  not implemented — see PROJECT_STATUS.md. The embedding index
-  (`EmbeddingIndexService`) already isolates "fitted vectors for one
-  dataset" behind a small interface specifically so the in-memory storage
-  can be swapped for FAISS/pgvector/Pinecone later without changing its
-  callers.
+  `DATABASE_URL=postgresql://...` with the bundled `psycopg2-binary` driver.
+  The test suite runs on SQLite; the `prod-postgres` compose profile is the
+  path for running against Postgres.
+- **Redis** backs caching and rate limiting, with an automatic in-memory
+  fallback (`backend/core/cache.py`).
+- **Vectors** live in an in-memory, per-dataset index
+  (`EmbeddingIndexService`). Exact search is fast enough at the 50k-row
+  upload cap; the index is isolated behind a small interface so it can move
+  to pgvector or FAISS without changing callers.
 
 ## Entity-relationship diagram
 
-Scoped to the tables added in this pass, plus how they relate to what
-already existed (`users`, `model_registry_entries`, `refresh_tokens`).
+The data-platform tables and how they relate to `users` and
+`model_registry_entries`.
 
 ```mermaid
 erDiagram
@@ -102,10 +98,9 @@ erDiagram
 | `extra_metadata` | JSON | currently just `{"cleaned": bool}`; open for future per-record annotation metadata |
 
 **Note on `created_by`/`modified_by`**: these store a user id as a plain
-string rather than a SQLAlchemy `ForeignKey` to `users.id`. That's a
-deliberate, documented shortcut for this pass, not an oversight — adding
-the FK constraint is a one-line change but wasn't required for anything
-built so far to function correctly.
+string rather than a SQLAlchemy `ForeignKey` to `users.id`, so deleting a
+user never cascades into dataset history. Adding the constraint is a
+one-line change if referential integrity matters more than that.
 
 ## Versioning & lineage
 
@@ -115,7 +110,7 @@ A new version is a full copy: a new `Dataset` row with `version` +1 and
 `parent_version_id` chain back to the root and returns the whole history
 oldest-first.
 
-This is a simple-but-real design, not a placeholder: it genuinely answers
+This answers
 "what did this dataset look like at version N" (query that version's
 records directly) and "what's the lineage" (walk the chain). It does NOT
 do field-level diffing between versions (e.g. "which 12 records changed
@@ -129,30 +124,31 @@ datasets are small enough that full copies are the right-sized tradeoff.
 training → evaluation → deployment) is traceable by following IDs across
 tables that already exist (`Dataset.id` → `ModelRegistryEntry.evaluation_run_id`
 → evaluation run JSON), but there's no single "lineage graph" API that
-assembles this automatically yet — see PROJECT_STATUS.md.
+assembles it automatically yet.
 
 ## Embedding guide
 
-`backend/nlp/embeddings/tfidf_embedder.py` implements the platform's
-`BaseEmbedder` interface using scikit-learn TF-IDF vectors (no HF Hub
-access in this sandbox — see PROJECT_STATUS.md for why this isn't a
-neural sentence-transformer). For anything beyond a single
-similarity-between-two-strings comparison, use
-`backend.services.embedding_service.embedding_index_service` instead: it
-fits one vectorizer over an entire dataset's records (`POST
-/datasets/{id}/embeddings/build`) and supports real cosine-similarity
-search (`GET /datasets/{id}/embeddings/search`) and pairwise similarity
-(`GET /datasets/{id}/embeddings/similarity`) against that fitted space.
+`EmbeddingIndexService` (`backend/services/embedding_service.py`) encodes a
+dataset's records once (`POST /datasets/{id}/embeddings/build`) and serves
+top-k search (`GET .../embeddings/search`) and pairwise similarity
+(`GET .../embeddings/similarity`) against that index.
+
+Two encoders sit behind it:
+
+| Encoder | Model | Finds | Needs |
+|---|---|---|---|
+| `dense` (default) | `sentence-transformers/all-MiniLM-L6-v2`, 384-d | paraphrases with no shared words ("lasts all day" ↔ "great battery life") | ML extras |
+| `tfidf` | word 1–2-gram TF-IDF | exact-term overlap | nothing extra |
+
+Vectors are L2-normalised, so cosine similarity is a dot product, and top-k
+uses `argpartition` (O(n)) before sorting only the winners.
 
 The index lives in memory, keyed by dataset id, for the lifetime of the
 process — rebuilding after new records are uploaded is currently manual
 (call `/build` again), not automatic.
 
-## What's NOT in this pass
+## Not yet supported
 
-See PROJECT_STATUS.md for the full list; the data-platform-specific gaps:
-annotation/human-review workflows, dataset search beyond name/description/tag
-(no semantic dataset search), backup/recovery, encryption-at-rest for
-dataset content, a dedicated audit-log table for dataset changes (structured
-logs capture these, but nothing queryable), and real data augmentation
-methods that need a model (back-translation, neural paraphrasing).
+Annotation / human-review workflows, persisting vector indices across
+restarts, backup/recovery, encryption-at-rest for dataset content, and
+model-based augmentation (back-translation, paraphrasing).

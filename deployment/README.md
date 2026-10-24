@@ -1,10 +1,8 @@
 # Deployment
 
-Placeholder for future deployment configs (Kubernetes manifests, Terraform,
-cloud-provider-specific IaC, CI/CD pipeline definitions).
+- `k8s/` — Kubernetes manifests (namespace, ConfigMap, Secret, backend, frontend, Redis,
+  Ingress). Apply with `kubectl apply -f deployment/k8s/`.
+- `../docker/` — backend and frontend Dockerfiles, nginx config, and a Compose file with
+  `dev`, `prod` and `prod-postgres` profiles.
 
-Not implemented in the architecture-skeleton stage — the app is
-containerized (see `../docker/`) and stateless by design (no in-memory
-session state, DB access via short-lived per-request sessions), so it's
-ready to run behind a load balancer / orchestrator once those configs are
-added.
+See `../docs/deployment-guide.md` for sizing, environment variables and scaling notes.

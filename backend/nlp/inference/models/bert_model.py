@@ -18,6 +18,7 @@ from backend.config.settings import get_settings
 from backend.core.constants import NLPTask
 from backend.core.exceptions import ModelInferenceError, ModelLoadError
 from backend.nlp.inference.base_model import BaseNLPModel, Prediction
+from backend.nlp.inference.hub import load_with_retry
 
 
 class BertModel(BaseNLPModel):
@@ -44,9 +45,13 @@ class BertModel(BaseNLPModel):
 
         settings = get_settings()
         try:
-            self._tokenizer = AutoTokenizer.from_pretrained(self.model_name, cache_dir=settings.model_cache_dir)
-            self._model = AutoModelForSequenceClassification.from_pretrained(
-                self.model_name, cache_dir=settings.model_cache_dir
+            self._tokenizer = load_with_retry(
+                lambda: AutoTokenizer.from_pretrained(self.model_name, cache_dir=settings.model_cache_dir)
+            )
+            self._model = load_with_retry(
+                lambda: AutoModelForSequenceClassification.from_pretrained(
+                    self.model_name, cache_dir=settings.model_cache_dir
+                )
             )
         except Exception as exc:  # noqa: BLE001 - re-raised as a domain error
             raise ModelLoadError(f"Failed to load model '{self.model_name}': {exc}") from exc

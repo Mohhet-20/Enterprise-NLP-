@@ -52,14 +52,13 @@ Checks the database is actually reachable (`SELECT 1`). Returns 503 if not
 The same database check as `/readiness`, standalone, with latency.
 
 ## `GET /api/v1/model`
-Real introspection: which tasks are registered in the plugin registry,
+Introspection: which tasks are registered in the plugin registry,
 which architectures the model factory can construct, and which model
 instances are actually cached in memory right now.
 
 ## `GET /api/v1/embedding`
-Honestly reports `"status": "not_implemented"` — the embedding platform
-is interface-only in this build (see PROJECT_STATUS.md). A 200 with a
-clear status is more useful than a fake "ok" or an opaque 404.
+Which encoder backs the dataset vector index (`dense` or `tfidf`), the
+embedding model, and how many dataset indices are currently built.
 
 ## `GET /api/v1/monitoring-health`
 Lightweight check that the metrics-collection subsystem itself is
@@ -72,7 +71,7 @@ Reports which cache backend is actually serving requests right now —
 (`backend/core/cache.py`). Both are a healthy `"ok"` status.
 
 ## `GET /api/v1/system`
-Real CPU/memory/disk percentages via `psutil`.
+CPU/memory/disk percentages via `psutil`.
 
 ## `GET /api/v1/version`
 App name, version, environment, Python version, and git commit (`unknown`
@@ -80,21 +79,35 @@ if not running from a git checkout).
 
 ## `GET /api/v1/status`
 Aggregates every check above into one page. `"status": "error"` only if a
-*critical* dependency (the database) is down — `embedding` reporting
-`not_implemented` is an expected, documented state, not an outage.
+*critical* dependency (the database) is down.
 
 ## `GET /api/v1/tasks`
-Returns the NLP tasks actually registered in the plugin registry (task
-identifier + default model). Drives the frontend's task selector so it
-never has to hardcode a task list separately from backend capability.
+Returns every registered task with its default model, a one-line
+description, and whether `/explain` supports it. Drives the frontend's task
+selector so it never hardcodes a task list.
 
 ## `POST /api/v1/evaluation/run`
-Requires `experiment:write`. Body: `{"task": "sentiment_analysis"}` (the
-only task with a registered evaluation baseline in this build — others
-return 400). Runs the lexicon baseline classifier
-(`backend/evaluation/baseline_classifier.py`) against the labeled
-evaluation set (`backend/evaluation/sample_dataset.py`), computes real
-metrics via scikit-learn, and persists the full report. Returns
+Requires `experiment:write` (plus `dataset:read` when `dataset_id` is set).
+
+```json
+{
+  "task": "sentiment_analysis",
+  "model": "served",
+  "eval_set": "sst2_validation",
+  "dataset_id": null
+}
+```
+
+- `model`: `served` (the task's transformer) or `lexicon_baseline` (sentiment only).
+- `eval_set`: `challenge_set` (48 hand-labelled hard cases) or `sst2_validation`
+  (872 sentences, fetched once via `datasets`). Built-in sets are sentiment-only.
+- `dataset_id`: evaluate on any uploaded, labelled Data Platform dataset instead.
+  Works for every single-label task; for zero-shot, the dataset's `label_set`
+  becomes the candidate labels.
+
+Multi-label tasks (toxicity, topic) and pair/vector tasks return 400 — accuracy
+against one gold label isn't defined for them. Metrics come from scikit-learn and
+the full report is persisted. Returns
 `EvaluationRunResult`: accuracy, macro/weighted F1, ROC-AUC, confusion
 matrix, per-class precision/recall/F1, calibration bins, and an error
 summary (confidence errors, hard examples, per-class and per-length-slice
@@ -133,17 +146,53 @@ Requires a bearer token (`Authorization: Bearer <token>`) with the
 ```
 
 `model_name` is optional — omitted, it falls back to the task's registered
-default model (see `backend/plugins/__init__.py`).
+default model (see `backend/plugins/__init__.py`). Task-specific fields:
+
+| Task | Extra fields |
+|---|---|
+| `zero_shot_classification` | `candidate_labels` (2–20, required), `multi_label` |
+| `semantic_similarity` | `text_pair` (required) — result is the cosine similarity |
 
 **Response** (`InferenceResponse`):
 ```json
 {
   "task": "sentiment_analysis",
-  "model_name": "distilbert-base-uncased-finetuned-sst-2-english",
-  "results": [{"label": "POSITIVE", "score": 0.98, "raw_scores": {"POSITIVE": 0.98, "NEGATIVE": 0.02}}],
-  "latency_ms": 42.1
+  "model_name": "distilbert-sst2",
+  "results": [{"label": "POSITIVE", "score": 0.98, "raw_scores": {"NEGATIVE": 0.02, "POSITIVE": 0.98}}],
+  "latency_ms": 18.4
 }
 ```
+
+Multi-label tasks (`toxicity_detection`, `topic_classification`) return one result per
+label whose sigmoid score is ≥ 0.5 (always at least the top label).
+
+## `POST /api/v1/predict/batch`
+Same permission. `{"task", "texts": [...], "candidate_labels"?}`, up to 64 texts. Texts
+are padded and run `INFERENCE_BATCH_SIZE` at a time. Returns one item per input, in
+order, plus total latency and throughput.
+
+## `POST /api/v1/explain`
+Same permission. `{"task", "text", "target_label"?, "n_steps"?}` (text ≤ 5,000 chars,
+8–128 steps, default 32). Integrated Gradients attributions for the served model:
+
+```json
+{
+  "label": "NEGATIVE",
+  "method": "integrated_gradients",
+  "target_score": 0.9987,
+  "baseline_score": 0.4113,
+  "convergence_delta": 0.0042,
+  "attributions": [{"token": "dull", "importance": 0.21}, {"token": "terrible", "importance": 0.34}]
+}
+```
+
+`convergence_delta` is Σ attributions − (target − baseline); near zero means the
+approximation is faithful. Available for tasks whose `/tasks` entry has
+`explainable: true` (sentiment, emotion, toxicity).
+
+## `POST /api/v1/embed`
+Same permission. `{"texts": [...]}` (≤ 64) → 384-dimensional L2-normalised vectors
+from `all-MiniLM-L6-v2`.
 
 ## Model Registry
 
@@ -180,8 +229,8 @@ Scientist, Admin, Super Admin — not the read-only/analyst roles by default).
 - `POST /api/v1/datasets` — create a dataset shell (`name`, `task`,
   optional `description`/`label_set`). Starts empty, `status: draft`.
 - `POST /api/v1/datasets/{id}/upload` — multipart CSV upload (`text`,
-  `label` columns). Runs the real cleaning pipeline (toggle with
-  `?apply_cleaning=false`), then real validation, then persists every row
+  `label` columns). Runs the cleaning pipeline (toggle with
+  `?apply_cleaning=false`), then validation, then persists every row
   as a `DatasetRecord`. Returns the updated dataset + a full
   `ValidationReportSchema` (duplicate/empty/short/long/missing-label/
   invalid-label counts, per-issue affected row indices, label
@@ -207,16 +256,15 @@ Scientist, Admin, Super Admin — not the read-only/analyst roles by default).
 
 ## Embedding Platform
 
-Real TF-IDF embeddings (scikit-learn) scoped per dataset — see
-`docs/data-platform-guide.md` for why TF-IDF instead of a neural
-embedder. All three require `dataset:read`.
+A per-dataset vector index, encoded with MiniLM sentence embeddings by default
+(`EMBEDDING_ENCODER=tfidf` for a lexical, download-free index). All three require
+`dataset:read`.
 
-- `POST /api/v1/datasets/{id}/embeddings/build` — fits a TF-IDF vectorizer
-  over the dataset's current records, held in memory keyed by dataset id.
-  Returns vector count + vocabulary size.
-- `GET /api/v1/datasets/{id}/embeddings/search?query=&top_k=` — real
-  cosine-similarity search against the fitted index; 404 if `/build`
-  hasn't been called yet for this dataset.
+- `POST /api/v1/datasets/{id}/embeddings/build` — encodes the dataset's current
+  records into an in-memory index. Returns vector count, dimension, encoder, model
+  and build time.
+- `GET /api/v1/datasets/{id}/embeddings/search?query=&top_k=` — exact top-k cosine
+  search; 404 if `/build` hasn't been called for this dataset.
 - `GET /api/v1/datasets/{id}/embeddings/similarity?record_id_a=&record_id_b=`
   — pairwise cosine similarity between two records already in the index.
 
@@ -227,7 +275,7 @@ by `task:model_name`. Backing implementation: `backend/monitoring/metrics.py`.
 ## `GET /api/v1/audit-logs`
 Requires `audit:read` (Auditor, Admin, Super Admin only — deliberately not
 readable by every role that can read experiments/datasets). Filterable by
-`actor_id`, `action`, `resource_type`, `resource_id`. Populated by real
+`actor_id`, `action`, `resource_type`, `resource_id`. Populated by these
 events: login success/failure/lockout, registration, model
 approve/reject/deploy/rollback/champion-set, dataset upload — written
 synchronously in the same request as the action (never as a background
