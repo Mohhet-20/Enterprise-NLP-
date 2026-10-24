@@ -1,0 +1,36 @@
+{
+  "environment": {
+    "model": "distilbert-sst2",
+    "cpu": "Intel Core Ultra 9 185H laptop",
+    "threads": 16,
+    "rounds": 5,
+    "torch": "2.14.1+cpu",
+    "python": "3.11.9"
+  },
+  "results": [
+    {
+      "variant": "fp32",
+      "size_mb": 267.9,
+      "p50_ms_batch1": 18.54,
+      "p95_ms_batch1": 24.7,
+      "throughput_batch32": 41.7,
+      "throughput_batch32_range": [
+        40.0,
+        96.7
+      ],
+      "sst2_val_accuracy": 0.9037
+    },
+    {
+      "variant": "int8-dynamic",
+      "size_mb": 138.7,
+      "p50_ms_batch1": 23.68,
+      "p95_ms_batch1": 41.72,
+      "throughput_batch32": 122.6,
+      "throughput_batch32_range": [
+        100.5,
+        240.5
+      ],
+      "sst2_val_accuracy": 0.8899
+    }
+  ]
+}

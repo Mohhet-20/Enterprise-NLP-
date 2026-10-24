@@ -1,0 +1,20 @@
+{
+  "model_name": "distilbert/distilbert-base-uncased",
+  "dataset_name": "stanfordnlp/sst2",
+  "num_epochs": 1,
+  "learning_rate": 3e-05,
+  "batch_size": 32,
+  "output_dir": "artifacts/models/distilbert-sst2",
+  "text_column": "sentence",
+  "label_column": "label",
+  "train_split": "train",
+  "eval_split": "validation",
+  "max_train_samples": null,
+  "max_eval_samples": null,
+  "max_length": 64,
+  "weight_decay": 0.01,
+  "warmup_ratio": 0.06,
+  "seed": 42,
+  "train_samples_used": 67349,
+  "eval_samples_used": 872
+}

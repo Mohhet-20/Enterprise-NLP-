@@ -38,21 +38,23 @@ def model_size_mb(model) -> float:
         return os.path.getsize(path) / 1e6
 
 
-def latency_ms(model, tokenizer, texts, batch_size, warmup=5, iters=50):
-    batches = [texts[i : i + batch_size] for i in range(0, len(texts), batch_size)]
-    timings = []
+def encode_batches(tokenizer, texts, batch_size, n_batches):
+    """Tokenise up front so timings measure the model, not the tokenizer."""
+    return [
+        tokenizer(texts[i * batch_size : (i + 1) * batch_size], return_tensors="pt", padding=True, truncation=True, max_length=128)
+        for i in range(n_batches)
+    ]
+
+
+def time_batches(model, batches) -> list[float]:
     with torch.inference_mode():
-        for i in range(warmup + iters):
-            batch = batches[i % len(batches)]
-            enc = tokenizer(batch, return_tensors="pt", padding=True, truncation=True, max_length=128)
+        model(**batches[0])  # warm-up
+        timings = []
+        for enc in batches:
             start = time.perf_counter()
             model(**enc)
-            if i >= warmup:
-                timings.append((time.perf_counter() - start) * 1000)
-    timings.sort()
-    p50 = statistics.median(timings)
-    p95 = timings[int(0.95 * (len(timings) - 1))]
-    return p50, p95, batch_size / (p50 / 1000)
+            timings.append((time.perf_counter() - start) * 1000)
+    return timings
 
 
 def accuracy(model, tokenizer, sentences, labels, batch_size=64):
@@ -72,6 +74,8 @@ def main() -> None:
     parser.add_argument("--model", default=default)
     parser.add_argument("--threads", type=int, default=torch.get_num_threads())
     parser.add_argument("--out-dir", default="benchmarks")
+    parser.add_argument("--rounds", type=int, default=5)
+    parser.add_argument("--cpu-label", default=None, help="human-readable CPU name for the report")
     args = parser.parse_args()
     torch.set_num_threads(args.threads)
 
@@ -88,17 +92,32 @@ def main() -> None:
         AutoModelForSequenceClassification.from_pretrained(args.model).eval(), {torch.nn.Linear}, dtype=torch.qint8
     )
 
+    singles = encode_batches(tokenizer, sentences, 1, 100)
+    batches32 = encode_batches(tokenizer, sentences, 32, 10)
+    variants = {"fp32": fp32, "int8-dynamic": int8}
+
+    # Alternate variants across rounds so thermal / turbo drift on a laptop
+    # hits both equally; report the median round.
+    per_round = {name: {"p50": [], "p95": [], "tput": []} for name in variants}
+    for _ in range(args.rounds):
+        for name, model in variants.items():
+            t1 = sorted(time_batches(model, singles))
+            t32 = time_batches(model, batches32)
+            per_round[name]["p50"].append(statistics.median(t1))
+            per_round[name]["p95"].append(t1[int(0.95 * (len(t1) - 1))])
+            per_round[name]["tput"].append(32 * len(t32) / (sum(t32) / 1000))
+
     rows = []
-    for name, model in (("fp32", fp32), ("int8-dynamic", int8)):
-        b1 = latency_ms(model, tokenizer, sentences, batch_size=1)
-        b32 = latency_ms(model, tokenizer, sentences, batch_size=32, iters=20)
+    for name, model in variants.items():
+        r = per_round[name]
         rows.append(
             {
                 "variant": name,
                 "size_mb": round(model_size_mb(model), 1),
-                "p50_ms_batch1": round(b1[0], 2),
-                "p95_ms_batch1": round(b1[1], 2),
-                "throughput_batch32": round(b32[2], 1),
+                "p50_ms_batch1": round(statistics.median(r["p50"]), 2),
+                "p95_ms_batch1": round(statistics.median(r["p95"]), 2),
+                "throughput_batch32": round(statistics.median(r["tput"]), 1),
+                "throughput_batch32_range": [round(min(r["tput"]), 1), round(max(r["tput"]), 1)],
                 "sst2_val_accuracy": round(accuracy(model, tokenizer, sentences, gold), 4),
             }
         )
@@ -106,8 +125,9 @@ def main() -> None:
 
     env = {
         "model": os.path.basename(os.path.normpath(args.model)),
-        "cpu": platform.processor() or platform.machine(),
+        "cpu": args.cpu_label or platform.processor() or platform.machine(),
         "threads": args.threads,
+        "rounds": args.rounds,
         "torch": torch.__version__,
         "python": platform.python_version(),
     }
@@ -119,23 +139,28 @@ def main() -> None:
     lines = [
         "# Inference benchmark: FP32 vs dynamic INT8",
         "",
-        f"Model `{env['model']}` · {env['cpu']} · {env['threads']} threads · torch {env['torch']}",
+        f"Model `{env['model']}` · {env['cpu']} · {env['threads']} threads · torch {env['torch']} · "
+        f"median of {env['rounds']} alternating rounds; tokenisation excluded",
         "",
-        "| Variant | Size (MB) | p50 latency, batch 1 (ms) | p95 latency, batch 1 (ms) | Throughput, batch 32 (texts/s) | SST-2 val accuracy |",
+        "| Variant | Size (MB) | p50 latency, batch 1 (ms) | p95 latency, batch 1 (ms) | Throughput, batch 32 (texts/s, min–max) | SST-2 val accuracy |",
         "|---|---|---|---|---|---|",
     ]
     for r in rows:
         lines.append(
             f"| {r['variant']} | {r['size_mb']} | {r['p50_ms_batch1']} | {r['p95_ms_batch1']} | "
-            f"{r['throughput_batch32']} | {r['sst2_val_accuracy']:.2%} |"
+            f"{r['throughput_batch32']} ({r['throughput_batch32_range'][0]}–{r['throughput_batch32_range'][1]}) | "
+            f"{r['sst2_val_accuracy']:.2%} |"
         )
+    def ratio(new: float, old: float, better: str, worse: str) -> str:
+        return f"{new / old:.2f}× {better}" if new >= old else f"{old / new:.2f}× {worse}"
+
+    acc_delta = (base["sst2_val_accuracy"] - quant["sst2_val_accuracy"]) * 100
     lines += [
         "",
-        f"INT8 is **{base['size_mb'] / quant['size_mb']:.1f}× smaller**, "
-        f"**{base['p50_ms_batch1'] / quant['p50_ms_batch1']:.2f}× faster** at batch 1 and "
-        f"**{quant['throughput_batch32'] / base['throughput_batch32']:.2f}×** the batch-32 throughput, for a "
-        f"**{(base['sst2_val_accuracy'] - quant['sst2_val_accuracy']) * 100:+.2f} pt** accuracy change "
-        f"(positive = accuracy lost).",
+        f"INT8 is {base['size_mb'] / quant['size_mb']:.1f}× smaller, "
+        f"{ratio(base['p50_ms_batch1'], quant['p50_ms_batch1'], 'faster', 'slower')} at batch 1, "
+        f"has {ratio(quant['throughput_batch32'], base['throughput_batch32'], 'higher', 'lower')} batch-32 throughput, "
+        f"and {'loses' if acc_delta >= 0 else 'gains'} {abs(acc_delta):.2f} accuracy points.",
         "",
         "Reproduce: `python scripts/benchmark_inference.py`",
     ]

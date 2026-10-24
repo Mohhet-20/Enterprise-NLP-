@@ -1,0 +1,74 @@
+{
+  "lexicon-baseline-v1": {
+    "sst2_validation": {
+      "accuracy": 0.5573,
+      "macro_f1": 0.4438,
+      "roc_auc": 0.6172,
+      "n": 872,
+      "by_length": {
+        "short": 0.5057,
+        "medium": 0.5554,
+        "long": 0.6032
+      }
+    },
+    "challenge_set": {
+      "accuracy": 0.8125,
+      "macro_f1": 0.8118,
+      "roc_auc": 0.8598,
+      "n": 48,
+      "by_length": {
+        "short": 0.8636,
+        "medium": 0.7391,
+        "long": 1.0
+      }
+    }
+  },
+  "distilbert/distilbert-base-uncased-finetuned-sst-2-english": {
+    "sst2_validation": {
+      "accuracy": 0.9106,
+      "macro_f1": 0.9104,
+      "roc_auc": 0.9718,
+      "n": 872,
+      "by_length": {
+        "short": 0.931,
+        "medium": 0.912,
+        "long": 0.8889
+      }
+    },
+    "challenge_set": {
+      "accuracy": 0.875,
+      "macro_f1": 0.8741,
+      "roc_auc": 0.9714,
+      "n": 48,
+      "by_length": {
+        "short": 0.9091,
+        "medium": 0.8261,
+        "long": 1.0
+      }
+    }
+  },
+  "distilbert-sst2 (ours)": {
+    "sst2_validation": {
+      "accuracy": 0.9037,
+      "macro_f1": 0.9035,
+      "roc_auc": 0.9698,
+      "n": 872,
+      "by_length": {
+        "short": 0.908,
+        "medium": 0.9074,
+        "long": 0.881
+      }
+    },
+    "challenge_set": {
+      "accuracy": 0.8125,
+      "macro_f1": 0.8118,
+      "roc_auc": 0.9554,
+      "n": 48,
+      "by_length": {
+        "short": 0.8182,
+        "medium": 0.7826,
+        "long": 1.0
+      }
+    }
+  }
+}
