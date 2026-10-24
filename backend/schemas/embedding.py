@@ -6,8 +6,13 @@ from pydantic import BaseModel
 class EmbeddingIndexStatsSchema(BaseModel):
     dataset_id: str
     num_vectors: int
-    vocabulary_size: int
+    dimension: int
+    encoder: str
+    model_name: str
+    build_seconds: float
     built_at: float
+
+    model_config = {"protected_namespaces": ()}
 
 
 class NearestNeighborResultSchema(BaseModel):

@@ -85,6 +85,8 @@ class Settings(BaseSettings):
     # Locally fine-tuned sentiment checkpoint (scripts/train_sentiment.py).
     # Served in preference to the public SST-2 checkpoint when present.
     sentiment_checkpoint_dir: str = "./artifacts/models/distilbert-sst2"
+    # Dataset vector index: "dense" (sentence-transformers) or "tfidf".
+    embedding_encoder: str = "dense"
 
     # --- Experiment tracking ---
     experiments_dir: str = "./experiments_store"
@@ -125,6 +127,9 @@ class TestingSettings(Settings):
     # concern, not something the test suite itself should trip over.
     rate_limit_requests_per_minute: int = 100_000
     auth_rate_limit_requests_per_minute: int = 100_000
+    # Unit tests must not download weights; dense search is covered by the
+    # integration suite.
+    embedding_encoder: str = "tfidf"
 
 
 class ProductionSettings(Settings):

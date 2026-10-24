@@ -132,7 +132,7 @@ class HFSequenceClassificationTrainer(BaseTrainer):
             args=args,
             train_dataset=train_tok.remove_columns([c for c in train_tok.column_names if c not in ("input_ids", "attention_mask", cfg.label_column)]),
             eval_dataset=eval_tok.remove_columns([c for c in eval_tok.column_names if c not in ("input_ids", "attention_mask", cfg.label_column)]),
-            tokenizer=tokenizer,
+            processing_class=tokenizer,
             data_collator=DataCollatorWithPadding(tokenizer),
             compute_metrics=compute_metrics,
         )
