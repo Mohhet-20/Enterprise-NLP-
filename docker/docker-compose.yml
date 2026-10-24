@@ -62,13 +62,17 @@ services:
       - ../backend:/app/backend
     command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
-  # --- prod profile: built image, no bind mounts, multiple workers ---
+  # --- prod profile: built image, no bind mounts ---
+  # One worker (the image default): each worker would load its own copy of
+  # every model. Scale with `--scale backend=N` behind a proxy instead.
   backend:
     <<: *backend-common
     profiles: ["prod"]
     ports:
       - "8000:8000"
-    command: ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+    volumes:
+      - model_cache:/app/.model_cache
+      - ../artifacts/models:/app/artifacts/models:ro
 
   frontend:
     build:
@@ -109,3 +113,4 @@ networks:
 volumes:
   redis_data:
   postgres_data:
+  model_cache:

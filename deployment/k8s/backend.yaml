@@ -44,13 +44,17 @@ spec:
                 name: nlp-platform-config
             - secretRef:
                 name: nlp-platform-secrets
+          # Sized for MAX_LOADED_MODELS=4 resident transformers (~0.3–1.1GB
+          # each in fp32) plus the API process. Lower MAX_LOADED_MODELS in the
+          # ConfigMap before lowering these, or the pod will be OOM-killed
+          # the first time a large model (e.g. XLM-R language ID) loads.
           resources:
             requests:
-              cpu: "250m"
-              memory: "256Mi"
-            limits:
               cpu: "1000m"
-              memory: "512Mi"
+              memory: "3Gi"
+            limits:
+              cpu: "4000m"
+              memory: "5Gi"
           # Hits the real endpoints built in backend/api/v1/endpoints/health.py
           # — not placeholder paths.
           readinessProbe:
@@ -70,10 +74,18 @@ spec:
           volumeMounts:
             - name: sqlite-data
               mountPath: /data
+            - name: model-cache
+              mountPath: /app/.model_cache
       volumes:
         - name: sqlite-data
           persistentVolumeClaim:
             claimName: backend-sqlite-pvc
+        # Downloaded HF weights. emptyDir means each new pod re-downloads on
+        # first use; swap for a ReadOnlyMany PVC pre-populated by a Job to
+        # make cold starts instant.
+        - name: model-cache
+          emptyDir:
+            sizeLimit: 6Gi
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

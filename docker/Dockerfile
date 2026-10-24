@@ -16,8 +16,10 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+COPY requirements.txt requirements-ml.txt ./
+# CPU-only torch: ~200MB wheel instead of ~2GB of CUDA libraries. For a GPU
+# image, swap the index URL for the matching CUDA one.
+RUN pip install --no-cache-dir --user torch==2.14.1 --index-url https://download.pytorch.org/whl/cpu     && pip install --no-cache-dir --user -r requirements-ml.txt
 
 # --- Stage 2: slim runtime image ---
 FROM python:3.11-slim AS runtime
@@ -35,7 +37,10 @@ ENV PATH=/home/appuser/.local/bin:$PATH \
     PYTHONDONTWRITEBYTECODE=1 \
     ENVIRONMENT=production
 
-RUN chown -R appuser:appuser /app
+# Mount a volume at /app/.model_cache to keep downloaded weights across
+# restarts; a locally fine-tuned checkpoint can be mounted at
+# /app/artifacts/models/distilbert-sst2.
+RUN mkdir -p /app/.model_cache /app/artifacts && chown -R appuser:appuser /app
 USER appuser
 
 EXPOSE 8000

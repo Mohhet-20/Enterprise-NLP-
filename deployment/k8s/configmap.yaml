@@ -13,3 +13,5 @@ data:
   REDIS_URL: "redis://redis:6379/0"
   RATE_LIMIT_REQUESTS_PER_MINUTE: "60"
   ALLOWED_ORIGINS: '["https://app.example.com"]'
+  MAX_LOADED_MODELS: "4"
+  EMBEDDING_ENCODER: "dense"
