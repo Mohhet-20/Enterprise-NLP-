@@ -62,7 +62,28 @@ uvicorn backend.main:app --host 127.0.0.1 --port 8000
 python scripts/load_test.py --base-url http://127.0.0.1:8000 --concurrency 20 --requests 300
 ```
 
-LOAD_RESULTS
+Results on an Intel Core Ultra 9 185H laptop: one uvicorn worker, SQLite, the fine-tuned
+DistilBERT, rate limit raised for the test, client on the same machine.
+
+| Endpoint | Concurrency | Requests | Success | p50 | p95 | p99 | Throughput |
+|---|---|---|---|---|---|---|---|
+| `POST /predict` (sentiment) | 1 | 200 | 100% | 17.8 ms | 20.4 ms | 25.6 ms | 54.8 req/s |
+| `POST /predict` (sentiment) | 8 | 400 | 100% | 119.9 ms | 150.8 ms | 341.9 ms | 63.8 req/s |
+| `GET /health` | 20 | 1000 | 100% | 29.0 ms | 53.3 ms | 230.1 ms | 556.6 req/s |
+
+**What the load test found.** The first `/predict` run measured 165 ms p50 and 6 req/s,
+even though the forward pass takes ~9 ms. Throughput also *fell* under concurrency, to
+4.9 req/s at 8 clients. The cause was `ModelFactory` running `gc.collect()` on every
+`get_model` call. A full collection walks the whole heap, which with transformer weights
+loaded costs ~150 ms. Collecting only after an actual eviction brought p50 to 17.8 ms
+(9.3× faster) and 8-client throughput to 63.8 req/s (13×). A regression test pins the
+behaviour (`test_factory_does_not_garbage_collect_on_cache_hits`).
+
+**Reading the numbers.** Inference is CPU-bound and PyTorch already uses every core for a
+single forward pass, so extra concurrency mostly queues: throughput rises only ~16% from
+1 to 8 clients while latency grows with the queue. More throughput on one box comes from
+batching requests together (`/predict/batch`, or server-side micro-batching), INT8 for
+batch work (`benchmarks/results.md`), or more replicas.
 
 ## Not covered
 

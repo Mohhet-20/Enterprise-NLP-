@@ -72,10 +72,15 @@ class ModelFactory:
     def _evict_if_needed(self, keep: tuple) -> None:
         loaded = [key for key, inst in self._cache.items() if inst.is_loaded and key != keep]
         # `keep` is about to be (or already is) loaded, so it counts toward the cap.
+        evicted = False
         while len(loaded) + 1 > self._max_loaded and loaded:
             victim = loaded.pop(0)
             self._cache[victim].unload()
-        gc.collect()
+            evicted = True
+        # A full collection costs ~150ms with transformer weights on the heap,
+        # so only pay it when weights were actually released.
+        if evicted:
+            gc.collect()
 
     def list_cached_models(self) -> Dict[str, bool]:
         """Which (architecture, model_name) pairs have been instantiated, and

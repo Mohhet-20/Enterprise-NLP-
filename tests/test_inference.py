@@ -328,3 +328,15 @@ def test_hub_loads_retry_transient_errors_only(monkeypatch):
     with pytest.raises(OSError):
         load_with_retry(missing_repo)
     assert calls["n"] == 1
+
+
+def test_factory_does_not_garbage_collect_on_cache_hits(monkeypatch):
+    import backend.nlp.inference.model_factory as mf
+
+    collections = []
+    monkeypatch.setattr(mf.gc, "collect", lambda: collections.append(1))
+    monkeypatch.setitem(mf._ARCHITECTURE_REGISTRY, ModelArchitecture.BERT, _CountingModel)
+    factory = ModelFactory(max_loaded_models=2)
+    for _ in range(50):
+        factory.get_model(ModelArchitecture.BERT, "a").predict("x", NLPTask.SENTIMENT_ANALYSIS)
+    assert collections == []

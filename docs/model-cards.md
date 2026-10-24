@@ -33,14 +33,15 @@ cached in `MODEL_CACHE_DIR`.
 
 ## Known limitations of the public checkpoints
 
-- **Emotion:** trained on English social-media, dialogue and review text. "neutral"
-  absorbs much ambiguous input.
+- **Emotion:** English only, trained on a mix of social-media, dialogue and review
+  datasets. Single-label: a sentence that is both angry and sad gets one label.
 - **Toxicity:** trained on Jigsaw Wikipedia comments, and it carries the identity-term
   bias that the Jigsaw Unintended Bias work documents. Measured here: "I am a gay man."
   scores 0.22 `toxic` and "I am a black person." 0.23, against 0.001 for "I am a tall
   man.". Both are under the 0.5 flag threshold, but about 200× the neutral baseline.
   Don't use it as the only signal for moderation decisions.
-- **Topic:** trained on tweets, so it works best on short, informal text.
+- **Topic:** trained on tweets, so long formal text (news articles, reports) is out of
+  domain.
 - **Language ID:** 20 languages only. Very short inputs are unreliable: "ok", "no" and
   "hello" all come back as Swahili (`sw`, 0.32–0.70 confidence). A full sentence is
   identified at >0.99. Gate on input length, or treat < 3 words as "unknown".
