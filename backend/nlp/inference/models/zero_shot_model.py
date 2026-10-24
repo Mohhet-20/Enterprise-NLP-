@@ -52,7 +52,10 @@ class ZeroShotModel(BaseNLPModel):
 
         self.load()
         multi_label = bool(kwargs.get("multi_label", False))
-        output = self._pipeline(text, candidate_labels=labels, multi_label=multi_label)
+        # Score every (text, hypothesis) pair in one padded forward pass. The
+        # pipeline's default batch_size=1 runs one pass per label, which is
+        # ~4x slower at 8 labels for identical scores.
+        output = self._pipeline(text, candidate_labels=labels, multi_label=multi_label, batch_size=len(labels))
         raw_scores = {label: round(float(score), 6) for label, score in zip(output["labels"], output["scores"])}
         top_label, top_score = output["labels"][0], float(output["scores"][0])
         return [Prediction(label=top_label, score=round(top_score, 6), raw_scores=raw_scores)]
