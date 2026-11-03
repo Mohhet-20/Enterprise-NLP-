@@ -207,7 +207,8 @@ docker/               Dockerfiles + Compose
 - Vector indices are in-memory per process (pgvector is the next step).
 - No MFA, password reset or email verification.
 - No distributed job queue, scheduled re-evaluation, tracing or Prometheus endpoint.
-- Monitoring and Admin pages in the UI are placeholders.
+- Monitoring counters live in the API process and reset on restart; the Admin page is an audit-log viewer (user and role
+  management are API-only).
 
 ## License
 

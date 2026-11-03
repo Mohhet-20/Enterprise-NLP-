@@ -341,3 +341,32 @@ export interface OverallStatus {
   status: string;
   checks: Record<string, SubsystemCheck>;
 }
+
+export interface InferenceMetricStats {
+  count: number;
+  error_rate: number;
+  avg_latency_ms: number;
+}
+
+/** Keyed by "task:model_name". */
+export type InferenceMetrics = Record<string, InferenceMetricStats>;
+
+export interface SystemResources {
+  status: string;
+  cpu_percent?: number;
+  memory_percent?: number;
+  disk_percent?: number;
+  detail?: string;
+}
+
+export interface AuditLog {
+  id: string;
+  actor_id: string | null;
+  actor_username: string | null;
+  action: string;
+  resource_type: string | null;
+  resource_id: string | null;
+  details: Record<string, unknown>;
+  ip_address: string | null;
+  created_at: string;
+}

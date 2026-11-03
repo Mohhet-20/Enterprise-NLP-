@@ -16,3 +16,12 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => false,
   }),
 });
+
+// jsdom doesn't implement ResizeObserver either — Recharts' ResponsiveContainer
+// subscribes to one on mount. A no-op is enough: tests assert on data, not layout.
+class ResizeObserverStub {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+Object.defineProperty(window, "ResizeObserver", { writable: true, value: ResizeObserverStub });

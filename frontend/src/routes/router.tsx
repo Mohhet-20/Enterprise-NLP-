@@ -10,7 +10,8 @@ import { DatasetDetailPage } from "@/pages/DatasetDetailPage";
 import { ModelsPage } from "@/pages/ModelsPage";
 import { EvaluationsPage } from "@/pages/EvaluationsPage";
 import { EvaluationDetailPage } from "@/pages/EvaluationDetailPage";
-import { ComingSoonPage } from "@/pages/ComingSoonPage";
+import { MonitoringPage } from "@/pages/MonitoringPage";
+import { AdminPage } from "@/pages/AdminPage";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 export const router = createBrowserRouter([
@@ -29,9 +30,8 @@ export const router = createBrowserRouter([
           { path: "/datasets/:id", element: <DatasetDetailPage /> },
           { path: "/evaluations", element: <EvaluationsPage /> },
           { path: "/evaluations/:runId", element: <EvaluationDetailPage /> },
-          { path: "/monitoring", element: <ComingSoonPage /> },
-          { path: "/admin", element: <ComingSoonPage /> },
-          { path: "/copilot", element: <ComingSoonPage /> },
+          { path: "/monitoring", element: <MonitoringPage /> },
+          { path: "/admin", element: <AdminPage /> },
         ],
       },
     ],

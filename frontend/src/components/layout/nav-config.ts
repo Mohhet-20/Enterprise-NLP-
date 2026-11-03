@@ -6,7 +6,6 @@ import {
   ClipboardList,
   LineChart,
   ShieldCheck,
-  Sparkles,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -58,22 +57,14 @@ export const navItems: NavItem[] = [
     label: "Monitoring",
     path: "/monitoring",
     icon: LineChart,
-    implemented: false,
-    description: "Live model monitoring — coming soon",
+    implemented: true,
+    description: "Live inference traffic, latency, errors and host resources",
   },
   {
     label: "Admin",
     path: "/admin",
     icon: ShieldCheck,
-    implemented: false,
-    description: "Users, roles & audit logs — coming soon",
+    implemented: true,
+    description: "Searchable audit trail of every privileged action",
   },
 ];
-
-export const copilotItem: NavItem = {
-  label: "Copilot",
-  path: "/copilot",
-  icon: Sparkles,
-  implemented: false,
-  description: "AI assistant — coming soon",
-};
