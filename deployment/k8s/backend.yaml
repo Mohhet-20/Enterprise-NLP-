@@ -17,7 +17,7 @@ spec:
     spec:
       # Soft anti-affinity: prefer spreading backend pods across nodes so
       # a single node failure doesn't take out every replica — "where
-      # practical" per the spec, so this is a preference, not a hard
+      # practical" by design, so this is a preference, not a hard
       # requirement (a hard requirement would block scheduling entirely
       # on a small/single-node cluster).
       affinity:
