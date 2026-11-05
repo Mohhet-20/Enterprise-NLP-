@@ -21,7 +21,7 @@ RUN pip install --user datasets==3.1.0
 WORKDIR /app
 COPY backend ./backend
 COPY scripts/fetch_model.py scripts/export_sst2.py scripts/demo_build.py ./scripts/
-ARG MODEL_URL=https://github.com/Mohhet-20/Enterprise-NLP-/releases/download/v1.0.0/distilbert-sst2.zip
+ARG MODEL_URL=https://github.com/Mohhet-20/Enterprise-NLP-/releases/download/v1.1.0/distilbert-sst2.zip
 ARG MODEL_SHA256=9610ca7bdb568c055d7293505e2916118f05880349260ac72e7533d40d3ae756
 RUN python scripts/fetch_model.py "$MODEL_URL" "$MODEL_SHA256" /app/models/distilbert-sst2 \
     && python scripts/export_sst2.py /app/data/sst2_validation.json
