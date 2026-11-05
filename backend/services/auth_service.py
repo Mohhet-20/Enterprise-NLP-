@@ -28,7 +28,9 @@ from backend.core.constants import UserRole
 from backend.core.exceptions import (
     AccountLockedError,
     AuthenticationError,
+    AuthorizationError,
     DuplicateUserError,
+    FeatureDisabledError,
     InvalidRefreshTokenError,
 )
 from backend.core.time_utils import ensure_aware_utc
@@ -44,6 +46,8 @@ logger = get_logger("auth")
 
 class AuthService(BaseService):
     def register(self, db: Session, username: str, email: str, password: str) -> User:
+        if not get_settings().registration_enabled:
+            raise FeatureDisabledError("Self-service registration is turned off on this deployment.")
         users = UserRepository(db)
         if users.find_by_username(username) is not None:
             raise DuplicateUserError("Username is already taken.")
@@ -117,6 +121,30 @@ class AuthService(BaseService):
             resource_type="user", resource_id=user.id,
         )
         return user
+
+    def guest_session(self, db: Session) -> TokenBundle:
+        """Public demo: sign the visitor in as the shared guest account (a data scientist: can run models, upload
+        datasets and run evaluations; cannot administer). Off unless GUEST_ACCESS_ENABLED. The account has a random
+        password nobody knows, and an administrator account is never used as the guest."""
+        settings = get_settings()
+        if not settings.guest_access_enabled:
+            raise FeatureDisabledError("Guest access is not available on this deployment.")
+        users = UserRepository(db)
+        guest = users.find_by_username(settings.guest_username)
+        if guest is None:
+            guest = users.create(User(
+                username=settings.guest_username,
+                email=f"{settings.guest_username}@guest.invalid",
+                hashed_password=hash_password(secrets.token_urlsafe(32)),
+                role=UserRole.DATA_SCIENTIST.value,
+            ))
+        if UserRole(guest.role) in (UserRole.ADMIN, UserRole.SUPER_ADMIN) or not guest.is_active:
+            raise AuthorizationError("Guest access is misconfigured on this deployment.")
+        audit_service.record(
+            db, action="auth.guest_session", actor_id=guest.id, actor_username=guest.username,
+            resource_type="user", resource_id=guest.id,
+        )
+        return self.issue_tokens(db, guest)
 
     def issue_tokens(self, db: Session, user: User, remember_me: bool = False) -> TokenBundle:
         settings = get_settings()

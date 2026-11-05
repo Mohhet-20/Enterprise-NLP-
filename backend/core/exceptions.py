@@ -54,6 +54,11 @@ class DuplicateUserError(PlatformError):
     status_code = 409
 
 
+class FeatureDisabledError(PlatformError):
+    default_message = "This feature is not enabled on this deployment."
+    status_code = 404
+
+
 class AuthorizationError(PlatformError):
     default_message = "You do not have permission to perform this action."
     status_code = 403

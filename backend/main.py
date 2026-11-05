@@ -30,6 +30,26 @@ configure_logging()
 logger = get_logger("api")
 
 
+def _preload_models() -> None:
+    """Warm the served tasks' models (one at a time; see BaseNLPModel's load lock). Failures are logged, not fatal:
+    the model then loads on first use as usual."""
+    from backend.nlp.inference.model_factory import model_factory
+    from backend.plugins.plugin_registry import get_task_plugin, list_supported_tasks
+
+    seen = set()
+    for task in list_supported_tasks():
+        plugin = get_task_plugin(task)
+        key = (plugin.default_architecture, plugin.default_model_name)
+        if key in seen:
+            continue
+        seen.add(key)
+        try:
+            model_factory.get_model(plugin.default_architecture, plugin.default_model_name, task=task).load()
+            logger.info("model_preloaded", extra={"task": task.value})
+        except Exception as exc:  # noqa: BLE001 - preloading is an optimisation
+            logger.warning("model_preload_failed", extra={"task": task.value, "error": str(exc)})
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("startup", extra={"environment": settings.environment.value})
@@ -45,6 +65,11 @@ async def lifespan(app: FastAPI):
         seed_db.close()
 
     import backend.plugins  # noqa: F401  registers all task plugins
+
+    if settings.preload_models:
+        import threading
+
+        threading.Thread(target=_preload_models, name="model-preload", daemon=True).start()
 
     yield
     logger.info("shutdown")

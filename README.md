@@ -6,6 +6,9 @@ fine-tuned here on SST-2. Classifier predictions can be explained word by word w
 Integrated Gradients, and any single-label model can be scored on held-out or uploaded
 data, all behind an authenticated, role-based API with a React UI.
 
+**Live demo: [enterprise-nlp.vercel.app](https://enterprise-nlp.vercel.app)** — choose *Explore the live demo*. It runs the
+fine-tuned sentiment model with explanations and MiniLM similarity on a free 512 MB instance; see [Hosted demo](#hosted-demo).
+
 ![Playground: prediction with Integrated Gradients explanation](docs/images/playground-explain.png)
 
 ## What it does
@@ -116,6 +119,35 @@ Details: [docs/architecture-guide.md](docs/architecture-guide.md).
   including one that mounts the whole app shell. Driving the real UI with Playwright found
   two bugs no unit test had caught: a provider-wiring crash after login, and mislabelled
   calibration buckets. Both are fixed and covered by tests now.
+
+## Hosted demo
+
+The [live demo](https://enterprise-nlp.vercel.app) runs on free hosting: the React app on Vercel, which proxies `/api/*` to
+the API on Render's free tier (512 MB of memory, a tenth of a CPU). All 8 models need about 2–3 GB, so the demo serves the
+two that fit and shows the other five tasks as available in the full deployment:
+
+- **Served:** sentiment with the DistilBERT fine-tuned here (Integrated Gradients explanations included), semantic similarity
+  and embeddings (MiniLM, which also powers dataset search). `GET /tasks` lists what an instance serves and, under
+  `not_served`, what it doesn't, so the UI says so instead of failing.
+- **Pre-built at image build time** ([scripts/demo_build.py](scripts/demo_build.py)): the fine-tuned model and the lexicon
+  baseline evaluated on the challenge set and the full SST-2 validation split, the model taken through approval →
+  production → deployed → champion, and a 200-sentence dataset uploaded and evaluated. The fine-tuned weights come from this
+  repository's GitHub release and are verified by SHA-256 before use ([scripts/fetch_model.py](scripts/fetch_model.py)).
+- **Sized for the instance:** measured under a 512 MB, no-swap, 10%-CPU cgroup. Models load in the background at
+  startup, one at a time; explanations run in chunks of 4 interpolation steps with at most 16 steps (same attributions,
+  bounded memory; the response still reports the convergence delta); evaluations batch 8 texts and the served model is
+  evaluated on at most 100 examples per request; the SST-2 split is read from a JSON export, so `datasets` and pyarrow
+  are not in the runtime image.
+- **Sign-in:** *Explore the live demo* (`POST /api/v1/auth/guest`, off unless `GUEST_ACCESS_ENABLED=true`, rate-limited)
+  signs visitors in as a shared `data_scientist`: run models, upload datasets, run evaluations; no administration or audit
+  log. Self-registration is off and every pre-existing account gets a random password at startup; the owner's
+  administrator comes from hosting secrets (`NLP_ADMIN_USERNAME`, `NLP_ADMIN_PASSWORD`).
+- **Reset:** every start copies the showcase afresh ([scripts/demo_start.py](scripts/demo_start.py)). The free instance
+  sleeps when idle, so the first visit after a pause takes a minute or two, and explanations take several seconds on a
+  tenth of a CPU.
+
+Deploy files: [render.yaml](render.yaml), [deploy/demo/Dockerfile](deploy/demo/Dockerfile),
+[frontend/vercel.json](frontend/vercel.json). A full deployment uses [docker/](docker/) or [deployment/k8s/](deployment/k8s/).
 
 ## Quickstart
 

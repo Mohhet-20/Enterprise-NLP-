@@ -6,7 +6,12 @@ list separately from the backend's real capabilities.
 
 from fastapi import APIRouter
 
-from backend.plugins.plugin_registry import display_model_name, get_task_plugin, list_supported_tasks
+from backend.plugins.plugin_registry import (
+    display_model_name,
+    get_task_plugin,
+    list_not_served_tasks,
+    list_supported_tasks,
+)
 
 router = APIRouter()
 
@@ -23,5 +28,10 @@ def list_tasks() -> dict:
                 "explainable": get_task_plugin(task).explainer is not None,
             }
             for task in tasks
-        ]
+        ],
+        # Implemented, but not served by this instance (a small host serves a subset; see Settings.served_tasks).
+        "not_served": [
+            {"task": p.task.value, "default_model": display_model_name(p.default_model_name), "description": p.description}
+            for p in list_not_served_tasks()
+        ],
     }

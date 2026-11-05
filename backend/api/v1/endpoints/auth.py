@@ -46,6 +46,18 @@ def login(request: LoginRequest, db: Session = Depends(get_db_session)) -> Token
     )
 
 
+@router.post("/auth/guest", response_model=TokenResponse)
+def guest(db: Session = Depends(get_db_session)) -> TokenResponse:
+    """Public demo sign-in as the shared guest account; 404 unless GUEST_ACCESS_ENABLED."""
+    bundle = auth_service.guest_session(db)
+    return TokenResponse(
+        access_token=bundle.access_token,
+        refresh_token=bundle.refresh_token,
+        expires_in=bundle.expires_in,
+        user=UserPublic.model_validate(bundle.user),
+    )
+
+
 @router.post("/auth/refresh", response_model=TokenResponse)
 def refresh(request: RefreshRequest, db: Session = Depends(get_db_session)) -> TokenResponse:
     bundle = auth_service.rotate_refresh_token(db, request.refresh_token)

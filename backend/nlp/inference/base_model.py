@@ -8,6 +8,8 @@ ever import a specific model class directly — always go through
 `ModelFactory` (model_factory.py) and depend on `BaseNLPModel`.
 """
 
+import functools
+import threading
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Dict, List
@@ -22,6 +24,11 @@ class Prediction:
     raw_scores: Dict[str, float] = field(default_factory=dict)
 
 
+# One model loads at a time, process-wide: a request arriving while a model is being preloaded waits for it instead
+# of loading a second copy (which on a small host is the difference between fitting in memory and not).
+_LOAD_LOCK = threading.RLock()
+
+
 class BaseNLPModel(ABC):
     """
     Strategy interface. Every concrete model (BertModel, DistilBertModel,
@@ -31,6 +38,22 @@ class BaseNLPModel(ABC):
 
     model_name: str
     supported_tasks: List[NLPTask]
+
+    def __init_subclass__(cls, **kwargs) -> None:
+        super().__init_subclass__(**kwargs)
+        own_load = cls.__dict__.get("load")
+        if own_load is None or getattr(own_load, "_serialised", False):
+            return
+
+        @functools.wraps(own_load)
+        def load(self) -> None:
+            if self._is_loaded:
+                return
+            with _LOAD_LOCK:
+                own_load(self)  # implementations re-check _is_loaded, so a waiter returns immediately
+
+        load._serialised = True  # type: ignore[attr-defined]
+        cls.load = load  # type: ignore[method-assign]
 
     def __init__(self, model_name: str) -> None:
         self.model_name = model_name

@@ -27,12 +27,14 @@ from typing import Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
 
+from backend.config.settings import get_settings
 from backend.core.constants import NLPTask
 from backend.core.exceptions import (
     EmptyDatasetError,
     ExternalServiceError,
     RecordNotFoundError,
     UnsupportedEvaluationTaskError,
+    ValidationError,
 )
 from backend.evaluation.baseline_classifier import baseline_sentiment_classifier
 from backend.evaluation.error_analysis import EvalSampleResult, error_analyzer
@@ -58,7 +60,6 @@ SINGLE_LABEL_TASKS = {
 
 BUILTIN_EVAL_SETS = {"challenge_set", "sst2_validation"}
 MAX_EVAL_SAMPLES = 5_000
-EVAL_BATCH_SIZE = 32
 
 # Cap how many misclassified samples ride along in the API response body —
 # the full list is always in the persisted JSON report and the CSV export.
@@ -70,6 +71,14 @@ def _normalise(label: str) -> str:
 
 
 def _load_sst2_validation() -> List[LabeledExample]:
+    # A JSON export ([{"sentence", "label"}], labels as names) avoids importing `datasets` at runtime: small hosts
+    # export it at build time (scripts/export_sst2.py) and point SST2_VALIDATION_FILE at it.
+    local = get_settings().sst2_validation_file
+    if local:
+        import json
+
+        with open(local, encoding="utf-8") as fh:
+            return [LabeledExample(row["sentence"], row["label"].upper()) for row in json.load(fh)]
     try:
         from datasets import load_dataset
 
@@ -99,6 +108,12 @@ class EvaluationService(BaseService):
             raise UnsupportedEvaluationTaskError("The lexicon baseline only covers sentiment_analysis.")
 
         examples, set_name, label_set = self._load_examples(task, eval_set, dataset_id, db)
+        cap = get_settings().max_served_eval_examples
+        if model != "lexicon_baseline" and len(examples) > cap:
+            raise ValidationError(
+                f"This deployment evaluates the served model on at most {cap} examples per run "
+                f"({set_name} has {len(examples)}). Its results for larger sets are already listed under Evaluations."
+            )
         if task == NLPTask.ZERO_SHOT_CLASSIFICATION and len(label_set) < 2:
             raise UnsupportedEvaluationTaskError(
                 "Zero-shot evaluation needs a dataset whose label_set has at least 2 labels."
@@ -156,8 +171,9 @@ class EvaluationService(BaseService):
         kwargs = {"candidate_labels": label_set} if task == NLPTask.ZERO_SHOT_CLASSIFICATION else {}
 
         out: List[Tuple[str, float]] = []
-        for i in range(0, len(texts), EVAL_BATCH_SIZE):
-            for preds in served.predict_batch(texts[i : i + EVAL_BATCH_SIZE], task, **kwargs):
+        batch = get_settings().eval_batch_size
+        for i in range(0, len(texts), batch):
+            for preds in served.predict_batch(texts[i : i + batch], task, **kwargs):
                 out.append((preds[0].label, preds[0].score))
         return out, display_model_name(plugin.default_model_name)
 

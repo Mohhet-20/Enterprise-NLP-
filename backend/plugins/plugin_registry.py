@@ -31,10 +31,22 @@ class TaskPlugin:
 
 
 _TASK_PLUGINS: Dict[NLPTask, TaskPlugin] = {}
+# Plugins this build knows but this instance does not serve (Settings.served_tasks), for GET /tasks.
+_NOT_SERVED: Dict[NLPTask, TaskPlugin] = {}
+
+
+def _served(task: NLPTask) -> bool:
+    from backend.config.settings import get_settings
+
+    wanted = {t.strip() for t in get_settings().served_tasks.split(",") if t.strip()}
+    return not wanted or task.value in wanted
 
 
 def register_task_plugin(plugin: TaskPlugin) -> None:
-    _TASK_PLUGINS[plugin.task] = plugin
+    if _served(plugin.task):
+        _TASK_PLUGINS[plugin.task] = plugin
+    else:
+        _NOT_SERVED[plugin.task] = plugin
 
 
 def get_task_plugin(task: NLPTask) -> TaskPlugin:
@@ -46,6 +58,10 @@ def get_task_plugin(task: NLPTask) -> TaskPlugin:
 
 def list_supported_tasks() -> list[NLPTask]:
     return list(_TASK_PLUGINS.keys())
+
+
+def list_not_served_tasks() -> list[TaskPlugin]:
+    return list(_NOT_SERVED.values())
 
 
 def display_model_name(model_name: str) -> str:

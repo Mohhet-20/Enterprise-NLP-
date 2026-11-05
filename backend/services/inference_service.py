@@ -127,7 +127,9 @@ class InferenceService(BaseService):
         model, model_name = self._resolve(request.task, None)
         start = time.perf_counter()
         target = request.target_label or model.predict(request.text, request.task)[0].label
-        explanation = plugin.explainer(model, n_steps=request.n_steps).explain_full(request.text, target)
+        # Small hosts cap the interpolation steps (cost grows linearly); convergence_delta still reports faithfulness.
+        n_steps = min(request.n_steps, get_settings().max_explain_steps)
+        explanation = plugin.explainer(model, n_steps=n_steps).explain_full(request.text, target)
         latency_ms = (time.perf_counter() - start) * 1000
 
         return ExplainResponse(

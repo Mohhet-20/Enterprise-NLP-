@@ -114,3 +114,17 @@ def test_integrated_gradients_highlights_the_sentiment_word():
     assert top_word in {"terrible", "dull"}
     gap = explanation.target_score - explanation.baseline_score
     assert abs(explanation.convergence_delta) < 0.1 * max(abs(gap), 1e-6) + 0.02
+
+
+def test_integrated_gradients_in_small_batches_matches_one_pass():
+    # explain_batch_size bounds the memory peak on small hosts; it must not change the attributions.
+    from backend.explainability.integrated_gradients import IntegratedGradientsExplainer
+
+    model = _model(NLPTask.SENTIMENT_ANALYSIS)
+    text = "Not bad at all, the ending surprised me."
+    one = IntegratedGradientsExplainer(model, n_steps=32, internal_batch_size=0).explain_full(text, "POSITIVE")
+    chunked = IntegratedGradientsExplainer(model, n_steps=32, internal_batch_size=5).explain_full(text, "POSITIVE")
+    assert [a.token for a in one.attributions] == [a.token for a in chunked.attributions]
+    for a, b in zip(one.attributions, chunked.attributions):
+        assert abs(a.importance - b.importance) < 1e-4
+    assert abs(one.target_score - chunked.target_score) < 1e-5

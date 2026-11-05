@@ -41,7 +41,7 @@ class Settings(BaseSettings):
 
     # --- Core ---
     app_name: str = "Enterprise NLP Intelligence Platform"
-    app_version: str = "1.0.0"  # see CHANGELOG.md
+    app_version: str = "1.1.0"  # see CHANGELOG.md
     environment: Environment = Environment.DEVELOPMENT
     debug: bool = False
     api_v1_prefix: str = "/api/v1"
@@ -55,6 +55,11 @@ class Settings(BaseSettings):
     max_failed_login_attempts: int = 5
     account_lockout_minutes: int = 15
     allowed_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    # Self-service sign-up (POST /auth/register). Hosted demos turn it off and use guest sessions instead.
+    registration_enabled: bool = True
+    # Public demo: POST /auth/guest signs visitors in as a shared, non-admin guest account. Off by default.
+    guest_access_enabled: bool = False
+    guest_username: str = "guest"
 
     # --- Database ---
     database_url: str = "sqlite:///./nlp_platform.db"
@@ -82,9 +87,18 @@ class Settings(BaseSettings):
     max_batch_texts: int = 64
     # Upper bound on models holding weights in memory at once (LRU-evicted).
     max_loaded_models: int = 4
+    # Load the served tasks' models in a background thread at startup, so the first request does not pay the load.
+    preload_models: bool = False
+    # Integrated Gradients points per forward/backward pass; 0 = all at once (fastest, highest memory peak).
+    explain_batch_size: int = 0
+    # Upper bound on Integrated Gradients steps a request may ask for (the API accepts up to 128).
+    max_explain_steps: int = 128
     # Locally fine-tuned sentiment checkpoint (scripts/train_sentiment.py).
     # Served in preference to the public SST-2 checkpoint when present.
     sentiment_checkpoint_dir: str = "./artifacts/models/distilbert-sst2"
+    # Tasks this instance serves (comma separated NLPTask values); empty = all. A small host serves a subset and
+    # GET /tasks lists the rest as not served here, so clients can say so instead of failing.
+    served_tasks: str = ""
     # Dataset vector index: "dense" (sentence-transformers) or "tfidf".
     embedding_encoder: str = "dense"
 
@@ -92,6 +106,12 @@ class Settings(BaseSettings):
     experiments_dir: str = "./experiments_store"
 
     # --- Evaluation ---
+    # Optional local JSON export of the SST-2 validation split (scripts/export_sst2.py); empty = load via `datasets`.
+    sst2_validation_file: str = ""
+    # Texts per forward pass during evaluation; smaller lowers the memory peak on small hosts.
+    eval_batch_size: int = 32
+    # Largest evaluation set the served model may be run on per request (small hosts keep requests short).
+    max_served_eval_examples: int = 5_000
     evaluation_runs_dir: str = "./evaluation_runs_store"
 
     @field_validator("secret_key")

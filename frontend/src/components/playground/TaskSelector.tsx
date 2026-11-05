@@ -22,6 +22,7 @@ export function TaskSelector({ value, onChange }: TaskSelectorProps) {
   const { data, isLoading } = useTasks();
   // Raw vectors aren't meaningful to eyeball; /embed serves them to API clients.
   const registeredTasks = (data?.tasks ?? []).filter((t) => t.task !== "text_embeddings");
+  const notServed = (data?.not_served ?? []).filter((t) => t.task !== "text_embeddings");
 
   return (
     <Select value={value} onValueChange={(v) => onChange(v as NLPTask)}>
@@ -32,6 +33,11 @@ export function TaskSelector({ value, onChange }: TaskSelectorProps) {
         {registeredTasks.map((t) => (
           <SelectItem key={t.task} value={t.task}>
             {TASK_LABELS[t.task] ?? t.task}
+          </SelectItem>
+        ))}
+        {notServed.map((t) => (
+          <SelectItem key={t.task} value={t.task} disabled title={`${t.default_model}: runs in the full deployment`}>
+            {TASK_LABELS[t.task] ?? t.task} · full deployment
           </SelectItem>
         ))}
       </SelectContent>

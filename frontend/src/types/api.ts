@@ -34,6 +34,13 @@ export interface TaskInfo {
   explainable: boolean;
 }
 
+/** A task the platform implements but this instance does not serve (small hosts serve a subset). */
+export interface NotServedTask {
+  task: NLPTask;
+  default_model: string;
+  description: string;
+}
+
 export interface InferenceRequest {
   task: NLPTask;
   text: string;

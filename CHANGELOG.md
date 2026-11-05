@@ -3,6 +3,26 @@
 Follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and
 [Semantic Versioning](https://semver.org/).
 
+## [1.1.0] — 2026-11-05
+
+### Added
+- Hosted demo on free hosting (`deploy/demo/Dockerfile`, `render.yaml`, `frontend/vercel.json`): showcase built at image
+  build time (`scripts/demo_build.py`), fresh on every start (`scripts/demo_start.py`), fine-tuned weights fetched from the
+  GitHub release and verified by SHA-256 (`scripts/fetch_model.py`), SST-2 export (`scripts/export_sst2.py`).
+- `POST /auth/guest` (off unless `GUEST_ACCESS_ENABLED`): a shared, rate-limited `data_scientist` guest session, never an
+  administrator; *Explore the live demo* on the sign-in page when built with `VITE_GUEST_ACCESS=true`.
+- `REGISTRATION_ENABLED` switch for self-service sign-up.
+- `SERVED_TASKS`: an instance can serve a subset of tasks; `GET /tasks` lists the rest under `not_served` and the
+  playground shows them as available in the full deployment.
+- Small-host settings: `PRELOAD_MODELS` (background warm-up), `EXPLAIN_BATCH_SIZE`, `MAX_EXPLAIN_STEPS`,
+  `EVAL_BATCH_SIZE`, `MAX_SERVED_EVAL_EXAMPLES`, `SST2_VALIDATION_FILE`.
+
+### Changed
+- Integrated Gradients can run its interpolation path in chunks (`EXPLAIN_BATCH_SIZE`); attributions match the single
+  pass to within 1e-4 (`test_integrated_gradients_in_small_batches_matches_one_pass`).
+- Model loads are serialised process-wide, so a request arriving during a load waits instead of loading a second copy.
+- The sign-in page only mentions the seeded development admin in development builds.
+
 ## [1.0.0] — 2026-10-24
 
 ### Added

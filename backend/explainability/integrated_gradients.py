@@ -6,8 +6,10 @@ replaced by [PAD], special tokens kept), the attribution of dimension i is
 
     IG_i(x) = (x_i - x'_i) * ∫_0^1 ∂F(x' + α(x - x')) / ∂x_i dα
 
-approximated with a Riemann (trapezoid) sum over `n_steps` points, all run
-as one batched forward/backward pass. Per-token scores are the sum over the
+approximated with a Riemann (trapezoid) sum over `n_steps` points, run as
+batched forward/backward passes of at most `internal_batch_size` points
+(default: all at once). Smaller batches give the same attributions with a
+bounded activation peak, for small hosts. Per-token scores are the sum over the
 embedding dimension; sub-word pieces are then merged back into the
 original words using the fast tokenizer's word alignment.
 
@@ -33,11 +35,16 @@ class Explanation:
 
 
 class IntegratedGradientsExplainer(BaseExplainer):
-    def __init__(self, model, n_steps: int = 32, max_length: int = 128) -> None:
+    def __init__(self, model, n_steps: int = 32, max_length: int = 128, internal_batch_size: int | None = None) -> None:
         # `model` is a BertModel-family strategy exposing hf_model / hf_tokenizer.
         self._model = model
         self._n_steps = n_steps
         self._max_length = max_length
+        if internal_batch_size is None:
+            from backend.config.settings import get_settings
+
+            internal_batch_size = get_settings().explain_batch_size
+        self._batch = internal_batch_size if internal_batch_size and internal_batch_size > 0 else n_steps + 1
 
     def explain(self, text: str, predicted_label: str) -> List[TokenAttribution]:
         return self.explain_full(text, predicted_label).attributions
@@ -70,8 +77,6 @@ class IntegratedGradientsExplainer(BaseExplainer):
             x_base = embedding_layer(baseline_ids)
 
         alphas = torch.linspace(0.0, 1.0, self._n_steps + 1).view(-1, 1, 1)
-        path = (x_base + alphas * (x - x_base)).detach().requires_grad_(True)
-        mask = attention_mask.expand(path.shape[0], -1)
 
         def score(logits):
             probs = torch.sigmoid(logits) if multi_label else torch.softmax(logits, dim=-1)
@@ -79,10 +84,16 @@ class IntegratedGradientsExplainer(BaseExplainer):
 
         was_training = hf_model.training
         hf_model.eval()
+        grad_chunks, score_chunks = [], []
         with torch.enable_grad():
-            scores = score(hf_model(inputs_embeds=path, attention_mask=mask).logits)
-            (grads,) = torch.autograd.grad(scores.sum(), path)
+            for chunk in torch.split(alphas, self._batch):
+                path = (x_base + chunk * (x - x_base)).detach().requires_grad_(True)
+                chunk_scores = score(hf_model(inputs_embeds=path, attention_mask=attention_mask.expand(path.shape[0], -1)).logits)
+                (chunk_grads,) = torch.autograd.grad(chunk_scores.sum(), path)
+                grad_chunks.append(chunk_grads.detach())
+                score_chunks.append(chunk_scores.detach())
         hf_model.train(was_training)
+        grads, scores = torch.cat(grad_chunks), torch.cat(score_chunks)
 
         # Trapezoid rule over the path.
         avg_grads = ((grads[:-1] + grads[1:]) / 2).mean(dim=0)

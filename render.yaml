@@ -1,0 +1,22 @@
+# Render blueprint for the hosted public demo API. New > Blueprint > pick this repository.
+# The website is the frontend on Vercel (frontend/vercel.json), which proxies /api/* here.
+# Image: deploy/demo/Dockerfile - sized for the 512 MB free instance: the fine-tuned DistilBERT sentiment model with
+# explanations plus MiniLM similarity; evaluations and the model registry pre-built; guest access; resets on start.
+services:
+  - type: web
+    name: enterprise-nlp-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./deploy/demo/Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: '["https://enterprise-nlp.vercel.app"]'
+      # Your private administrator account (normal sign-in form). Set both in the dashboard; never commit them.
+      - key: NLP_ADMIN_USERNAME
+        sync: false
+      - key: NLP_ADMIN_PASSWORD
+        sync: false

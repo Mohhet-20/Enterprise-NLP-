@@ -1,20 +1,25 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { Waves, ArrowRight } from "lucide-react";
+import { Waves, ArrowRight, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { useLogin } from "@/hooks/useLogin";
+import { useGuestSession, useLogin } from "@/hooks/useLogin";
 import { useAuthStore } from "@/stores/useAuthStore";
+
+/** Hosted public demo build: offer a guest session instead of self-service sign-up. */
+const guestAccess = () => import.meta.env.VITE_GUEST_ACCESS === "true";
 
 export function LoginPage() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(false);
   const login = useLogin();
+  const guestSession = useGuestSession();
+  const guest = guestAccess();
   const logIn = useAuthStore((s) => s.logIn);
   const navigate = useNavigate();
 
@@ -32,6 +37,17 @@ export function LoginPage() {
       navigate("/playground");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Sign-in failed");
+    }
+  }
+
+  async function exploreDemo() {
+    try {
+      const bundle = await guestSession.mutateAsync();
+      logIn(bundle.access_token, bundle.refresh_token, bundle.user);
+      toast.success("Welcome! You're exploring the live demo.");
+      navigate("/playground");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not start a demo session");
     }
   }
 
@@ -57,14 +73,37 @@ export function LoginPage() {
           <CardHeader>
             <CardTitle>Sign in</CardTitle>
             <CardDescription>
-              New here?{" "}
-              <Link to="/register" className="font-medium text-primary hover:underline">
-                Create an account
-              </Link>
-              .
+              {guest ? (
+                "Explore the live demo, or sign in with your account."
+              ) : (
+                <>
+                  New here?{" "}
+                  <Link to="/register" className="font-medium text-primary hover:underline">
+                    Create an account
+                  </Link>
+                  .
+                </>
+              )}
             </CardDescription>
           </CardHeader>
           <CardContent>
+            {guest && (
+              <div className="mb-5 flex flex-col gap-3">
+                <Button type="button" onClick={() => void exploreDemo()} disabled={guestSession.isPending}>
+                  <Sparkles className="h-4 w-4" />
+                  {guestSession.isPending ? "Starting your session…" : "Explore the live demo"}
+                </Button>
+                <p className="text-xs leading-relaxed text-muted-foreground">
+                  Run the fine-tuned sentiment model with word-level explanations, compare texts semantically, and browse
+                  evaluations. Guest sessions can&apos;t administer the platform, and the demo resets when the server restarts.
+                </p>
+                <div className="flex items-center gap-3 text-xs text-muted-foreground" aria-hidden>
+                  <span className="h-px flex-1 bg-border" />
+                  or
+                  <span className="h-px flex-1 bg-border" />
+                </div>
+              </div>
+            )}
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div className="flex flex-col gap-1.5">
                 <Label htmlFor="username">Username</Label>
@@ -108,10 +147,12 @@ export function LoginPage() {
           </CardContent>
         </Card>
 
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Local development: a seeded <code className="font-mono">admin</code> account exists
-          in development — see the backend README for credentials.
-        </p>
+        {import.meta.env.DEV && (
+          <p className="mt-4 text-center text-xs text-muted-foreground">
+            Local development: a seeded <code className="font-mono">admin</code> account exists
+            in development — see the backend README for credentials.
+          </p>
+        )}
       </motion.div>
     </div>
   );

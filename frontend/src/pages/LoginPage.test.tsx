@@ -109,4 +109,29 @@ describe("LoginPage", () => {
       expect(useAuthStore.getState().user).toEqual(mockUser);
     });
   });
+
+  it("shows no guest option, and links to sign-up, in a normal build", () => {
+    renderLoginPage();
+    expect(screen.queryByRole("button", { name: /explore the live demo/i })).toBeNull();
+    expect(screen.getByRole("link", { name: /create an account/i })).toBeInTheDocument();
+  });
+
+  it("starts a guest session on the hosted demo build, with no credentials shown", async () => {
+    vi.stubEnv("VITE_GUEST_ACCESS", "true");
+    const guestUser = {
+      id: "guest-1", username: "guest", email: "guest@guest.invalid", role: "data_scientist" as const,
+      is_active: true, created_at: "2026-01-01T00:00:00Z", last_login_at: null,
+    };
+    vi.mocked(apiRequest).mockResolvedValue({
+      access_token: "a", refresh_token: "r", token_type: "bearer", expires_in: 1800, user: guestUser,
+    });
+    const user = userEvent.setup();
+    const { container } = renderLoginPage();
+    expect(screen.queryByRole("link", { name: /create an account/i })).toBeNull();
+    expect(container.textContent).not.toMatch(/ChangeMe|password is/i);
+    await user.click(screen.getByRole("button", { name: /explore the live demo/i }));
+    await waitFor(() => expect(useAuthStore.getState().user).toEqual(guestUser));
+    expect(vi.mocked(apiRequest)).toHaveBeenCalledWith("/auth/guest", { method: "POST", auth: false });
+    vi.unstubAllEnvs();
+  });
 });
