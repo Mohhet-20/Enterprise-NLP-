@@ -19,7 +19,7 @@ predictions, not a consumer or marketing surface.
   deep blue-black (not pure black) in dark mode.
 
 Deliberately not the cream+terracotta serif look or the near-black+neon-accent
-look that AI-generated interfaces default to — this is a data tool, not a
+look that many templates default to — this is a data tool, not a
 marketing page, so the palette stays desaturated and the accent is
 functional (it *is* the confidence indicator) rather than decorative.
 
